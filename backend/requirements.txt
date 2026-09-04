@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+networkx
+pytest
+httpx
+pandas
+geopandas
+shapely
+numpy
