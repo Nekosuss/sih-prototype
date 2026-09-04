@@ -67,6 +67,29 @@ RiskResult's `reasons`**: only 104 of the corridor's ~2,964 segments have
 any matched GSI observation. historical_landslide_count == 0 means "no
 matched historical record in the current dataset," never "confirmed safe."
 
+Part 11 addition: this component ALSO folds in
+RoadSegment.landslide_hazard_score (an official landslide hazard-ZONATION
+layer, "which areas are more prone" -- a different concept from the GSI
+HISTORICAL inventory above, "where landslides have been observed"; see
+app/data/hazard_layer_loader.py). The two are combined via MAX, not sum:
+they are correlated evidence for the SAME hazard (landslides), so adding
+their weights would double-count a segment where both real signals agree,
+while MAX reports whichever real signal is currently worse without
+inventing a statistically fused number neither source was calibrated
+against. This stays under the existing HISTORICAL_WEIGHT — no new weight
+was introduced, and RiskBreakdown's `historical_landslide_risk` field name
+is unchanged (renaming a public field would be a bigger compatibility break
+than documenting its slightly broadened meaning here). When
+landslide_hazard_score is None (its default, and — as of Part 11's
+delivery — its value for every real segment in this corridor, since no
+official APSAC zonation layer has actually been obtained; see
+hazard_layer_loader.py's module docstring), this reduces EXACTLY to the
+pre-Part-11 formula: see
+tests/test_hazard_layer.py::test_historical_landslide_risk_unchanged_when_no_hazard_layer.
+
+flood_hazard_score (also Part 11) is deliberately NOT folded into
+risk_score at all yet — see FLOOD_HAZARD_NOTE below.
+
 weather_risk: an externally supplied `weather_factor` in [0,1], defaulting
 to 0.0 when not supplied. This is a CURRENT-CONTEXT INPUT (e.g. a future
 live weather integration, or a manual demo control), not a trained
@@ -80,6 +103,24 @@ yet (app/models/incident.py is still a stub) — incident_factor_from_severity()
 below is the seam a future one plugs into, mapping the severity labels
 already sketched in ARCHITECTURE.md section 6 (minor/major/blocking) to a
 factor, without building the rest of that workflow now.
+
+--- FLOOD_HAZARD_NOTE (Part 11) ---
+
+RoadSegment.flood_hazard_class/flood_hazard_score (an official flood
+hazard-zonation layer — see app/data/hazard_layer_loader.py) are
+deliberately NOT read anywhere in this module, unlike landslide_hazard_score
+(folded into historical_landslide_risk above). The existing formula has no
+flood-shaped slot to fold it into without either (a) introducing a new
+weight — which would mean shrinking an existing one, i.e. quietly
+recalibrating a formula this project has repeatedly been told not to
+casually change — or (b) blending it into an unrelated component (slope,
+weather) in a way that would misrepresent what that component's existing
+public field name means. Flood hazard is therefore exposed as
+INFORMATIONAL segment/API data only (GET /hazards/segments/{id}) for now —
+the same honest, pre-scoring state `flood_susceptibility` has held since
+Part 2 — rather than fabricating a calibration for a component with zero
+real official data behind it today. It remains a clean seam for a future,
+deliberate weighting decision once real APSAC flood-zonation data exists.
 """
 import math
 from typing import Optional
@@ -162,29 +203,37 @@ def slope_risk(segment: RoadSegment) -> float:
 
 def historical_landslide_risk(segment: RoadSegment) -> float:
     """Real GSI-matched historical_landslide_count/nearest_landslide_distance_m
-    -> [0,1]. See app/config.py for the exact constants. count == 0 always
-    returns 0.0 here — deliberately: this function only reports what the
-    matched data says, it never guesses at unobserved hazard. The "count==0
-    is not proof of safety" caveat belongs in the *explanation* layer
-    (_build_reasons below), not silently baked into a nonzero score, since
-    fabricating a nonzero risk for segments with literally no matched
-    evidence would be exactly the kind of fabrication Part 4's data-first
-    approach has consistently avoided."""
+    -> [0,1], blended (Part 11) with RoadSegment.landslide_hazard_score (an
+    official landslide hazard-ZONATION layer, when available — see module
+    docstring's "Part 11 addition" paragraph above for the full reasoning).
+    count == 0 and landslide_hazard_score == None both contribute 0.0 here
+    — deliberately: this function only reports what real matched/zoned data
+    says, it never guesses at unobserved hazard. The "0 is not proof of
+    safety" caveat belongs in the *explanation* layer (_build_reasons
+    below), not silently baked into a nonzero score."""
     count = segment.historical_landslide_count
     if count <= 0:
-        return 0.0
-
-    count_score = min(1.0, math.log1p(count) / math.log1p(HISTORICAL_COUNT_REFERENCE))
-
-    if segment.nearest_landslide_distance_m is not None:
-        proximity_score = _clamp01(1.0 - segment.nearest_landslide_distance_m / HISTORICAL_PROXIMITY_MAX_M)
+        history_score = 0.0
     else:
-        proximity_score = 0.0
+        count_score = min(1.0, math.log1p(count) / math.log1p(HISTORICAL_COUNT_REFERENCE))
 
-    return _clamp01(
-        HISTORICAL_COUNT_VS_PROXIMITY_WEIGHT * count_score
-        + (1.0 - HISTORICAL_COUNT_VS_PROXIMITY_WEIGHT) * proximity_score
-    )
+        if segment.nearest_landslide_distance_m is not None:
+            proximity_score = _clamp01(1.0 - segment.nearest_landslide_distance_m / HISTORICAL_PROXIMITY_MAX_M)
+        else:
+            proximity_score = 0.0
+
+        history_score = _clamp01(
+            HISTORICAL_COUNT_VS_PROXIMITY_WEIGHT * count_score
+            + (1.0 - HISTORICAL_COUNT_VS_PROXIMITY_WEIGHT) * proximity_score
+        )
+
+    susceptibility_score = segment.landslide_hazard_score if segment.landslide_hazard_score is not None else 0.0
+    # MAX, not sum — see the module docstring's Part 11 paragraph. When
+    # landslide_hazard_score is None, susceptibility_score is 0.0, which
+    # never exceeds history_score (already clamped to [0,1] and >= 0), so
+    # this line is then a no-op and the pre-Part-11 value is returned
+    # unchanged.
+    return max(history_score, susceptibility_score)
 
 
 def weather_risk(weather_factor: Optional[float]) -> float:
@@ -265,6 +314,19 @@ def _build_reasons(
             "confirmed absence of hazard"
         )
 
+    if segment.landslide_hazard_score is not None:
+        reasons.append(
+            f"Landslide hazard zonation layer: {segment.landslide_hazard_class} "
+            f"(normalized score={segment.landslide_hazard_score:.2f}, "
+            f"source={segment.hazard_layer_source.get('landslide_hazard', 'unknown')})"
+        )
+    else:
+        reasons.append(
+            "No official landslide hazard-zonation layer available for this segment "
+            "(APSAC data not locally obtainable -- see backend/app/data/hazard_layer_loader.py); "
+            "historical GSI evidence only"
+        )
+
     if breakdown.weather_risk > 0.0:
         reasons.append(f"Elevated current weather risk supplied (factor={weather_factor:.2f})")
     elif weather_factor is None:
@@ -328,5 +390,9 @@ def assess_segment_risk(
             ),
             "weather_factor_supplied": str(weather_factor is not None),
             "incident_factor_supplied": str(incident_factor is not None),
+            "landslide_hazard_class": segment.landslide_hazard_class or "",
+            "landslide_hazard_score": "" if segment.landslide_hazard_score is None else f"{segment.landslide_hazard_score}",
+            "flood_hazard_class": segment.flood_hazard_class or "",
+            "flood_hazard_score": "" if segment.flood_hazard_score is None else f"{segment.flood_hazard_score}",
         },
     )

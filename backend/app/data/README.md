@@ -371,6 +371,714 @@ data.
 
 ---
 
+## Part 6: risk-aware routing
+
+`core/routing_engine.py`'s risk-aware routing section builds on Part 5's
+per-segment risk engine to make ROUTE selection consider risk, not just
+travel time. Full methodology is in that module's docstring (the
+"risk-aware routing" section) and `app/config.py` — this is a summary.
+
+**This is an explainable PROTOTYPE risk-aware routing system, not a
+trained ML route-prediction system.** Every formula below is a documented,
+auditable calculation over real data (DEM slope, GSI-matched landslide
+history) plus optional externally-supplied weather/incident context — none
+of it is a calibrated probability of a landslide or disruption occurring.
+
+**Baseline routing is unchanged**: `calculate_route()`/`edge_cost()` still
+cost edges by travel time only — `/routes/calculate` behaves exactly as
+before Part 6.
+
+**Risk-aware routing** (`calculate_risk_aware_route()`, new
+`/routes/calculate-risk-aware` endpoint) adds:
+
+- **Combined cost**: `risk_aware_edge_cost = travel_time_min * (1 +
+  RISK_WEIGHT * risk_score)` (`RISK_WEIGHT = 2.0`). Multiplicative rather
+  than an additive `travel_time_min + RISK_WEIGHT * risk_score` — that
+  form would need an arbitrary "minutes per unit of risk" conversion
+  constant and would charge a short risky segment the same flat penalty as
+  a long one. Scaling travel time itself makes the penalty proportional to
+  real exposure and needs only one weight; at `risk_score = 0` it reduces
+  exactly to the baseline cost.
+- **Hard unsafe threshold**: `HARD_UNSAFE_RISK_THRESHOLD = 0.65`. A
+  segment scoring at/above this is excluded from the risk-aware graph
+  entirely (`build_risk_aware_graph()`), in both directions — not merely
+  made expensive. **Not** set equal to the risk engine's own "critical"
+  display threshold (0.75): `TERRAIN_WEIGHT + HISTORICAL_WEIGHT = 0.70` is
+  the highest score reachable from real per-segment data alone (no
+  weather/incident supplied), so a 0.75 hard cutoff would be
+  mathematically unreachable without a hypothetical weather input. 0.65 is
+  chosen so a genuinely extreme real combination (very steep + several
+  very close matched historical landslides) can still trigger hard
+  exclusion on real data alone.
+- **Route risk aggregation** (`compute_route_risk_profile()`): **not** a
+  plain average — `aggregate_risk_score = 0.7 * max_segment_risk + 0.3 *
+  mean_segment_risk` (`ROUTE_AGGREGATE_MAX_WEIGHT = 0.7`), so one
+  dangerous segment on an otherwise-safe route is never diluted away.
+  `max_segment_risk`, `max_risk_segment_id`, and a per-`RiskLevel` segment
+  count are always reported alongside the aggregate.
+- **Route comparison** (`compare_fastest_and_safe_routes()`): computes the
+  fastest route AND the risk-aware route over the SAME real graph, and
+  classifies the result into exactly one of three cases — `RouteSafetyOutcome`:
+  - `fastest_route_is_safe` — the risk-aware optimizer agrees with the
+    fastest-time choice (same node path).
+  - `safer_route_selected` — the two diverge; the risk-aware route is
+    recommended (whether because the fastest route hit the hard threshold,
+    or simply because a real, slightly-slower path is meaningfully safer
+    under the weighted cost).
+  - `no_safe_route_available` — origin/destination are connected in the
+    ordinary graph, but every real path is blocked by the hard threshold.
+    Reported as a normal structured result (not an exception at the API
+    layer) — `recommended_route` is `None` in this case only.
+  A NEW `NoSafeRouteFoundError` (subclasses the existing
+  `NoRouteFoundError`) is raised by the lower-level
+  `calculate_risk_aware_route()` for this same situation, distinguishing
+  "a road exists but every option is unsafe" from "no road exists at all."
+- **weather_factor/incident_factor**: same externally-supplied `[0,1]`
+  current-context inputs as Part 5's risk engine, applied **uniformly
+  across the whole network** for one routing call — there is no
+  per-segment/per-region weather or incident targeting yet (that needs
+  weather simulation/field reporting, both later parts). Both default to
+  `None` ("no signal supplied"), never "confirmed clear."
+
+**Real-corridor validation** (`cd backend && python -m
+app.data.risk_aware_routing_validation`): every one of the 6 consecutive
+named-location legs is `fastest_route_is_safe` under default (no weather)
+conditions — the corridor's real maximum segment risk (~0.53) stays well
+under the 0.65 hard threshold on its own. Supplying a severe hypothetical
+`weather_factor=0.9, incident_factor=0.9` on Bhalukpong -> Bomdila pushes 4
+real segments (the "Doimara-Nichiphu" stretch) above the hard threshold,
+producing a genuine `safer_route_selected` result: a real +207 minute
+detour that avoids them entirely. No real origin/destination pair in this
+corridor — even under maximum `1.0`/`1.0` stress — currently produces
+`no_safe_route_available`; the corridor's one genuinely single-road
+stretch (Dirang -> Sela Pass, no real alternative — same finding as Part
+3/4) tops out at ~0.71 even then. `no_safe_route_available` is demonstrated
+instead with a small synthetic graph in
+`tests/test_risk_aware_routing.py`, per Part 6's own guidance that a tiny
+synthetic graph is acceptable for a scenario the real data doesn't
+currently produce.
+
+**Limitations of this prototype** (see also risk_engine.py /
+training_dataset_schema.md): no historical rainfall data exists yet, so
+weather_factor is always either omitted or a hand-supplied hypothetical,
+never a live measurement; no real Incident reporting pipeline exists yet;
+`RISK_WEIGHT`/`HARD_UNSAFE_RISK_THRESHOLD`/`ROUTE_AGGREGATE_MAX_WEIGHT` are
+demo-tuned constants, not calibrated against any ground-truth outcome data
+(none exists yet); and the PROCEED/REROUTE/SUSPEND decision workflow that
+would consume `RouteSafetyOutcome` is explicitly not built yet (a later
+part) — this part only makes the underlying routing capability available.
+
+---
+
+## Part 8: dynamic hazard response + rerouting
+
+**The current hazard controls are deterministic simulation inputs for
+prototype demonstration. They are not live weather or field observations.**
+Every hazard label, message, and API response says so explicitly (see
+`HAZARD_TYPE_LABEL` in `app/models/hazard.py` — every type is prefixed
+"SIMULATED").
+
+### Dynamic hazard state
+
+`app/models/hazard.py::HazardEvent` — a simulated event affecting one or
+more REAL segment ids, with `type` (`heavy_rain` / `landslide` /
+`road_blockage`), `severity` (`minor` / `major` / `blocking` — the SAME
+vocabulary Part 5's `incident_factor_from_severity` already defined),
+resulting `weather_factor`/`incident_factor` (derived, not hand-picked per
+event), a human `message`, and `active`/`cleared_at`. Stored in
+`StateStore` (`_hazards: dict[str, HazardEvent]`) exactly like routes
+already are — no database, a hazard is never deleted on clear (only marked
+`active=False`) so the demo can show history, and `reset_hazards()` gives a
+deterministic full wipe for between-demo resets.
+
+### Supported simulated events
+
+| Type | Severity | Effect |
+|---|---|---|
+| `heavy_rain` | minor/major/blocking | sets `weather_factor` (0.3/0.6/0.9 — `WEATHER_SEVERITY_FACTOR`, `app/config.py`) |
+| `landslide`, `road_blockage` | minor/major/blocking | sets `incident_factor` (0.2/0.5/1.0 — the existing `INCIDENT_SEVERITY_FACTOR`) |
+| `landslide`, `road_blockage` | **blocking** only | additionally marks the segment **operationally closed** — see below |
+
+### Static vs. dynamic data
+
+```
+STATIC (never touched by a hazard):
+DEM + GSI + OSM -> elevation_m, slope_deg, historical_landslide_count,
+                    nearest_landslide_distance_m (RoadSegment fields)
+
+DYNAMIC (a hazard only ever produces this):
+active hazards -> SegmentHazardContext{weather_factor, incident_factor, closed}
+                   (app/core/hazard_state.py, per-segment, transient)
+
+Combined by:
+risk_engine.assess_segment_risk(segment, weather_factor, incident_factor)
+                   (Part 5, UNCHANGED — no new/competing risk formula)
+        |
+        v
+Current (contextual) risk
+```
+`combine_active_hazards_into_segment_context()` never reads or writes a
+`RoadSegment` field — verified directly in
+`tests/test_hazard_response.py::test_hazard_does_not_mutate_static_segment_fields`
+(byte-for-byte equality check before/after). Clearing a hazard needs no
+"restore" step for exactly this reason: nothing on the segment was ever
+changed, only removed from the combination on the next call.
+
+### Why "blocking" landslide/road_blockage can close a segment outright
+
+`incident_risk` only carries `INCIDENT_WEIGHT` (0.10) in the combined
+score, so even `incident_factor=1.0` contributes just 0.10 — nowhere near
+`HARD_UNSAFE_RISK_THRESHOLD` (0.65) on its own. That's correct for an
+*ambiguous* incident report, but wrong for a simulated event that says, by
+construction, "this road is physically blocked": a blocked road isn't 10%
+riskier, it's unusable, regardless of the segment's terrain/history.
+`HAZARD_CLOSURE_TYPES`/`HAZARD_CLOSURE_SEVERITY` (`app/config.py`) make
+exactly `(landslide or road_blockage) + blocking` bypass the weighted
+formula: `build_risk_aware_graph()` excludes a `closed` segment from the
+graph outright (same as a hard-unsafe one), and
+`compute_route_risk_profile()` counts it in `unsafe_segment_count`
+regardless of its numeric `risk_score` — without ever fabricating that
+score itself as 1.0.
+
+### Risk reassessment
+
+`core/hazard_state.py::combine_active_hazards_into_segment_context()`
+combines multiple simultaneous hazards on the same segment via **MAX per
+factor** (not sum, not average) — the most conservative reading wins
+without producing hard-to-reason-about summed values. The resulting
+per-segment context is a pure ADDITION threaded through Part 6's existing
+functions (`build_risk_aware_graph`, `calculate_risk_aware_route`,
+`get_route_segment_risks`, `compute_route_risk_profile`,
+`compare_fastest_and_safe_routes` — all gained an optional
+`segment_context` parameter, default `None` reproducing prior behaviour
+exactly) — `assess_segment_risk()` itself was not touched.
+
+### Route decision: CONTINUE / REROUTE / SUSPEND
+
+`core/reroute_service.py::evaluate_route_decision()` — reuses
+`compare_fastest_and_safe_routes()` and `compute_route_risk_profile()`
+unchanged; adds only the decision + hysteresis layer:
+
+- **SUSPEND**: no feasible route avoids every hard-unsafe/closed segment
+  (Part 6's `no_safe_route_available`). `recommended_route` is `None` —
+  no replacement route is ever fabricated.
+- **CONTINUE**: no `previous_route` was given and a safe recommendation
+  exists; OR `previous_route` already is the recommended route; OR
+  `previous_route` is still feasible and the real alternative isn't
+  *meaningfully* better (hysteresis, below).
+- **REROUTE**: `previous_route` is no longer feasible (now hard-unsafe or
+  hazard-closed), OR a real alternative is meaningfully safer — and it
+  differs from `previous_route`. `recommended_route` is always a real,
+  already-computed alternative.
+
+### Hysteresis (kept deliberately simple)
+
+One margin, `ROUTE_CHANGE_HYSTERESIS_SCORE = 0.05` (`app/config.py`): when
+`previous_route` is still feasible, switch to a different real alternative
+only if its `aggregate_risk_score` is at least 0.05 lower. No time
+windows, no debounce timers, no optimization framework — and the margin is
+**bypassed entirely** the moment `previous_route` becomes infeasible
+(safety overrides stickiness; see
+`tests/test_hazard_response.py::test_hysteresis_does_not_apply_when_previous_route_becomes_infeasible`).
+
+### API endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /hazards/simulate` | trigger a hazard on real segment id(s); 400 on any unknown id |
+| `GET /hazards` | list hazards (`active_only=true` by default) |
+| `POST /hazards/{id}/clear` | deactivate one hazard (idempotent; 404 if unknown) |
+| `POST /hazards/reset` | remove ALL hazard history — deterministic demo reset |
+| `POST /routes/evaluate-disruption` | CONTINUE/REROUTE/SUSPEND for an origin/destination against every currently active hazard; `suspend` is a normal 200, not an error |
+
+`/routes/calculate` and `/routes/calculate-risk-aware` (Part 3/6) are
+unchanged.
+
+### Real-corridor demo scenario (see `tests/test_hazard_response.py` and `tests/test_api.py`)
+
+Bhalukpong -> Bomdila, exactly as validated in Part 6: normally
+`continue` (real max segment risk ~0.53, under the 0.65 threshold).
+Simulating a `road_blockage` at `blocking` severity on the REAL
+"Doimara-Nichiphu" segment(s) actually on that route (found by name from
+the loaded network, never hard-coded) closes them outright; re-evaluating
+returns `reroute` with a genuine alternative from the same graph (the same
++207-minute detour already found in Part 6, node-for-node) that avoids
+every blocked segment id. Clearing the hazard and re-evaluating returns
+`continue` again, unchanged from baseline.
+
+### SUSPEND scenario
+
+The real corridor's one genuinely single-road stretch (Dirang -> Sela
+Pass) doesn't naturally reach the hard threshold even under maximum
+hypothetical stress (see Part 6's own finding, ~0.71 at most). SUSPEND is
+therefore demonstrated with a small synthetic two-node, one-edge graph
+(`tests/test_hazard_response.py::test_no_alternative_hazard_causes_suspend`)
+— consistent with Part 6/8's guidance that the real network should never
+be altered just to manufacture a demo case.
+
+### Simulation limitations
+
+No live weather API, no real-time feed, no historical rainfall model — a
+hazard's `weather_factor`/`incident_factor` are fixed numbers from a
+severity lookup table, chosen for demo legibility, not calibrated against
+any ground truth (none exists yet — see
+`training_dataset_schema.md`). `weather_factor`/`incident_factor` passed
+directly to `/routes/calculate-risk-aware`/`/routes/evaluate-disruption`
+(separately from a hazard) still apply network-wide, not per-segment —
+only hazard-driven context is per-segment. No vehicle exists yet, so
+"previous route" is whatever route id a caller supplies, not a tracked
+vehicle position.
+
+---
+
+## Part 9: vehicle / GPS simulation
+
+**This is a DETERMINISTIC SIMULATION. It is NOT real GPS and must never be
+presented as live vehicle tracking.** `Vehicle.methodology_note`
+(`app/models/vehicle.py`) says so in every API response.
+
+### How position is computed
+
+A vehicle's `current_lat`/`current_lng` are always recomputed FRESH — never
+accumulated tick by tick — from two real inputs: (a) the actual geometry of
+its currently assigned route (`core/routing_engine.py`, the same Route
+model every other part uses — never a straight line between towns, never
+random coordinates), and (b) real elapsed wall-clock time since that route
+was assigned, converted to distance via a configurable simulated speed
+(`SIMULATION_SPEED_KMPH = 60.0`, `app/config.py`). Recomputing from a fixed
+time anchor on every read — rather than adding a small delta each tick — is
+what makes this immune to cumulative floating-point drift over a long demo
+session, and fully deterministic: the same elapsed time always produces
+the exact same position (`core/geo.py::interpolate_along_path` walks the
+real polyline vertices and linearly interpolates between the two that
+bracket the target distance).
+
+### No background loop
+
+There is no `asyncio` tick loop, no WebSocket, no queue. `GET /vehicles`
+and `GET /vehicles/{id}` call `advance_vehicle()` (`app/simulation/
+vehicle_simulator.py`) before returning — a client polling every ~1s
+*is* the simulation's update mechanism. This was a deliberate choice over
+the background-loop design originally sketched in `ARCHITECTURE.md`,
+because it needs no lifecycle management and stays trivially deterministic
+under polling.
+
+### Vehicle model and statuses
+
+`Vehicle{id, name, origin, destination, current_route, current_segment_id,
+current_lat, current_lng, progress, distance_travelled_km,
+distance_remaining_km, eta_minutes, speed_kmph, status, paused, route_risk,
+last_decision_reason, ...}` — `progress`/`distance_*`/`eta_minutes` are
+relative to whatever route is CURRENTLY assigned (see reroute handling
+below), not the original end-to-end journey, since a reroute can change
+the remaining distance.
+
+Statuses: `idle` (route computed, not started — see `POST .../start`),
+`en_route`, `rerouting` (a one-tick transitional signal for the poll where
+a hazard just forced a route change), `arrived`, `suspended` (Part 8's
+SUSPEND — frozen in place, no fabricated replacement route).
+`paused` is a separate boolean (set via `POST .../pause`), orthogonal to
+status — freezes advancement without changing what status was reported.
+
+### Hazard awareness (reusing Part 8 unchanged)
+
+On every advance, if there is at least one active simulated hazard AND it
+touches a segment still AHEAD of the vehicle (checked via a cheap
+`set` intersection first — a full re-evaluation only runs when that's
+non-empty), this module calls `core/reroute_service.py::
+evaluate_route_decision()` **unchanged** — no competing decision logic —
+against only the unfinished remainder of the route
+(`core/routing_engine.py::build_remaining_route()`), so a hazard on an
+already-passed segment can never retroactively reroute or suspend a
+vehicle that already drove safely past it (verified directly —
+`tests/test_vehicle_simulation.py::test_hazard_on_already_passed_segment_does_not_trigger_reroute`).
+A `suspended` vehicle is always re-checked regardless of the short-circuit,
+specifically so a cleared hazard can be detected and resume movement.
+
+**Reroute handling is a documented simplification**: rather than splicing
+the new path onto the already-driven prefix of the old one, this module
+simply replaces `current_route` with the fresh real route
+`evaluate_route_decision()` returned (which already starts at the
+vehicle's current position) and restarts the timing anchor for it. The
+vehicle's pre-reroute driven history is not reconstructed into one
+polyline. The vehicle is still always on a real graph edge following real
+geometry, and the reroute is always a real alternative path — never
+fabricated — this only affects how the "distance travelled so far" number
+is framed across a reroute.
+
+### API endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /vehicles` | create a vehicle (`name`, `origin`, `destination`, optional `mode: "risk-aware"\|"fastest"`) — starts `idle` |
+| `GET /vehicles` | list all vehicles, each advanced to "now" first |
+| `GET /vehicles/{id}` | one vehicle, advanced to "now" first |
+| `POST /vehicles/{id}/start` | begin movement, or resume after `/pause` |
+| `POST /vehicles/{id}/pause` | freeze movement in place |
+| `POST /vehicles/{id}/reset` | recompute a fresh initial route and zero all progress/timing |
+
+`mode="risk-aware"` (default) uses the safer of fastest/risk-aware (Part
+6) for the INITIAL route, same as every other risk-aware surface in this
+app; `mode="fastest"` uses the travel-time-only route instead (still
+reports `route_risk` for information, it just didn't drive path
+selection). Either way, in-flight hazard response always applies once the
+vehicle is moving.
+
+### Demo scenario (validated end to end — `tests/test_api.py::test_vehicle_reroutes_around_real_hazard_ahead`)
+
+Create a vehicle Bhalukpong -> Bomdila (real route, includes real
+"Doimara-Nichiphu" segments), start it, simulate a `road_blockage` at
+`blocking` severity on those real segments, poll — status becomes
+`rerouting` then `en_route` on a real alternative route that avoids every
+blocked segment id, exactly matching Part 6/8's already-validated
+Bhalukpong->Bomdila detour.
+
+### Limitations
+
+No real GPS/location hardware, no traffic/physics model, no acceleration —
+constant simulated speed only. Reroute history isn't spliced into one
+polyline (see above). No activity-log/reroute-event history endpoint yet
+(`GET /vehicles/{id}/history` from `ARCHITECTURE.md`'s original sketch is
+not implemented) — `last_decision_reason` reports only the most recent
+decision, not a full history.
+
+---
+
+## Part 10: real IMD rainfall -> weather_factor
+
+**This replaces nothing.** Part 8's simulated `heavy_rain` hazard (manual,
+deterministic, for demo control) still works exactly as before. Part 10
+adds a second, independent, REAL input path for the exact same
+`weather_factor` parameter `core/risk_engine.py::assess_segment_risk()`
+already accepted from Part 5 onward.
+
+### Source
+
+- **Dataset**: "IMD New High Spatial Resolution (0.25 x 0.25 degree) Long
+  Period (1901-2024) Daily Gridded Rainfall Data Set Over India" (Pai D.S.,
+  Latha Sridhar, Rajeevan M., Sreejith O.P., Satbhai N.S. and Mukhopadhyay
+  B., 2014, *MAUSAM* 65,1, pp1-18 -- cite this if the data is reused).
+- **Publisher**: India Meteorological Department, Climate Prediction Group,
+  Pune (https://www.imdpune.gov.in/cmpg/Griddata/Rainfall_25_NetCDF.html).
+- **Format**: classic NetCDF-3 (`scipy.io.netcdf_file` -- no netCDF4/HDF5 C
+  library dependency for this format).
+- **Grid**: 135 x 129 points, 0.25 x 0.25 degree, lon 66.5-100.0E, lat
+  6.5-38.5N. Units: millimetre/day. Missing/no-data cells use IMD's own
+  `-999.0` sentinel.
+- **Access**: the page itself has no direct download link; it POSTs a
+  `year` to `RF25.php`, which streams back `ind{year}_rfp25.nc`. Verified
+  directly against the live IMD server -- a real file, confirmed by its
+  `CDF\x01` magic bytes and internal FERRET-generated header, not scraped
+  from a third-party mirror.
+
+### What's actually downloaded/committed for this corridor
+
+`backend/scripts/fetch_rainfall_data.py --year 2023` downloads the full
+2023 file (~25MB, whole-India) into `app/data/rainfall_cache/` (gitignored
+-- re-downloadable, same reasoning as `dem_cache/` but this time the raw
+file itself is intentionally NOT committed, to keep the repository small),
+then extracts only the corridor bounding box (lat 25.75-28.00, lon
+91.50-93.00 -- the real corridor bbox lat 26.01-27.75/lon 91.54-92.98 plus
+one 0.25deg grid cell of margin) for every day of that year, writing the
+small, committed `app/data/rainfall_corridor_2023.csv` (70 grid cells x 365
+days = 25,550 rows, ~720KB -- comparable in size to the committed GSI
+CSVs). 1,095 of those rows (4.3%) are real IMD missing-value cells,
+preserved as an empty field, never coerced to `0.0`.
+
+### Loading and lookup
+
+`app/data/rainfall_loader.py::RainfallLoader` loads one corridor CSV into
+memory once (`get_default_rainfall_loader()` is a process-wide singleton,
+mirroring `dem_loader.get_default_dem_loader()`) and answers
+`get_daily_rainfall(lat, lon, date)` queries with an explicit
+`RainfallStatus`:
+
+| Status | Meaning |
+|---|---|
+| `ok` | a real observed value (may legitimately be `0.0` -- a real dry day) |
+| `missing_value` | a real grid cell exists here, but IMD's own value for this date is the `-999.0` no-data sentinel |
+| `no_coverage` | this coordinate or date falls outside the small locally extracted subset entirely |
+
+`rainfall_mm` is `None` for both `missing_value` and `no_coverage` --
+**never** silently `0.0`. Nearest-grid-cell lookup is plain Euclidean
+degree distance over the loaded lattice (accurate here since IMD's grid is
+regular and the corridor is small), rejected beyond
+`LOOKUP_MAX_DISTANCE_DEG` (0.2deg, just over half the grid's diagonal
+spacing) so a coordinate genuinely outside this regional extraction reports
+`no_coverage` rather than snapping to a many-degrees-away cell.
+
+### Mapping rainfall to road segments
+
+Each segment's real OSM geometry midpoint (`geometry[len(geometry)//2]` --
+the same representative-point convention `dem_validation.py::_nearest_segment`
+already uses) is looked up against the nearest real 0.25deg IMD grid cell.
+**This is grid-cell rainfall assigned to one representative point per
+segment, not a per-road-length rainfall measurement** -- a 0.25deg cell
+(~25-28km at this latitude) is far coarser than any single road segment,
+exactly like DEM/GSI features are also coarser approximations of a
+continuous reality (see the DEM/GSI sections above). `app/core/weather_factor.py::weather_factor_for_segment`/`rainfall_segment_context` do this
+lookup; `landslide_susceptibility`/`flood_susceptibility`/DEM
+slope/elevation/GSI counts are never read or touched by any of it.
+
+### rainfall_mm -> weather_factor
+
+`app/core/weather_factor.py::rainfall_mm_to_weather_factor` — a
+deterministic PIECEWISE LINEAR interpolation, thresholds and anchors in
+`app/config.py`:
+
+```
+0mm                       -> 0.0
+RAINFALL_LOW_MM (2.5mm)      -> RAINFALL_FACTOR_AT_LOW      (0.10)
+RAINFALL_MODERATE_MM (15.6mm) -> RAINFALL_FACTOR_AT_MODERATE (0.30)
+RAINFALL_HEAVY_MM (64.5mm)    -> RAINFALL_FACTOR_AT_HEAVY    (0.60)
+RAINFALL_EXTREME_MM (204.4mm) -> RAINFALL_FACTOR_AT_EXTREME  (1.0), and beyond
+```
+
+The four thresholds are **IMD's own official daily rainfall-intensity
+classification** (Light/Moderate/Heavy/Very Heavy/Extremely Heavy, as used
+in IMD press releases) -- not an arbitrary bucketing invented for this
+project. The factor values at each anchor are demo-legible, monotonically
+increasing choices (not fitted against any ground-truth disruption
+outcome -- none exists yet, same caveat as every other weight in
+`app/config.py`). `None` in (missing/no coverage) -> `None` out, which
+`risk_engine.weather_risk()` already treats as "no signal supplied" (0.0
+contribution) -- the exact same semantics the manual/hazard-driven
+`weather_factor` already had.
+
+### Feeding into the UNCHANGED Part 5/6/8 engines
+
+No formula in `risk_engine.py`, `routing_engine.py`, or
+`reroute_service.py` was changed. Two ways real rainfall reaches them,
+both purely additive:
+
+1. **Single segment**: `GET /weather/segments/{id}` computes the real
+   `weather_factor` for that segment/date and calls
+   `risk_engine.assess_segment_risk()` directly -- the exact same function
+   `/segments/{id}/risk-aware` already calls, just with a real-rainfall-
+   sourced `weather_factor` instead of a hazard-sourced one.
+2. **Routing**: `app/core/weather_factor.py::rainfall_segment_context()`
+   builds a `dict[segment_id, SegmentHazardContext]` -- the **exact Part 8
+   type** `build_risk_aware_graph()`/`compare_fastest_and_safe_routes()`/
+   `evaluate_route_decision()` already accept as `segment_context`. A
+   segment with no real observation for that date/location is simply
+   omitted from the dict (never given a fabricated `weather_factor=0.0`),
+   exactly like an inactive hazard is omitted from
+   `combine_active_hazards_into_segment_context()`. This is why Part 10
+   needed zero changes to `core/routing_engine.py` or
+   `core/reroute_service.py` -- the seam Part 8 built for simulated hazards
+   already generalizes to any per-segment context source.
+
+### API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /weather/rainfall?lat=&lon=&date=` | rainfall + weather_factor at an arbitrary point (date defaults to `DEFAULT_RAINFALL_OBSERVATION_DATE`) |
+| `GET /weather/segments/{id}?date=` | same, using a real segment's geometry midpoint, plus the resulting full `RiskResult` |
+| `GET /weather/corridor?date=` | the 7 named locations' rainfall/weather_factor, plus real segments currently at/above a "high rainfall" weather_factor threshold |
+
+### Date control (no wall-clock dependency, no forecasting)
+
+`DEFAULT_RAINFALL_OBSERVATION_DATE = "2023-06-21"` (`app/config.py`) is used
+whenever a caller doesn't specify a date. It is not arbitrary: it is this
+extracted dataset's own single heaviest corridor-wide daily rainfall in the
+one extracted year (165.4mm, confirmed by `rainfall_validation.py` scanning
+every loaded day, not hand-picked before looking at the data). The system
+never reads the machine's current date for this purpose, and this project
+does no forecasting -- only a real historical observation, or a caller-
+supplied ISO date within the extracted year.
+
+### Real-corridor validation (`cd backend && python -m app.data.rainfall_validation`)
+
+On `2023-06-21`, every one of the 6 real consecutive named-location legs
+remains `fastest_route_is_safe` / `continue` -- the real rainfall at the
+real segments nearest each town tops out around a 0.49 weather_factor (not
+every corridor segment sits under the single heaviest grid cell that day),
+and Bhalukpong -> Bomdila's real maximum segment risk reaches ~0.60,
+still under `HARD_UNSAFE_RISK_THRESHOLD` (0.65). **This is reported as the
+actual, honest result of real data** -- it is not adjusted to force a
+reroute. A guaranteed-reproducible high-rainfall reroute demonstration
+(independent of which historical day happens to be selected) instead uses
+a synthetic scenario, exactly like Part 6/8's own `no_safe_route_available`
+case: see `tests/test_rainfall.py::test_high_rainfall_increases_route_risk_and_can_trigger_reroute`.
+
+### Limitations
+
+- Only one year (2023) is extracted; a different demo date needs
+  re-running `fetch_rainfall_data.py --year <YYYY>` and updating
+  `DEFAULT_RAINFALL_OBSERVATION_DATE` (or passing `?date=` explicitly).
+- 0.25deg (~25-28km) grid-cell rainfall assigned to one representative
+  point per segment is a coarse approximation for any single road, exactly
+  like the DEM/GSI features above are coarse approximations of a
+  continuous reality -- never claimed to be road-level rainfall.
+- No forecasting, no live IMD feed -- this is historical reanalysis data,
+  selected/queried by date, same as any other Part 10 lookup.
+- `RAINFALL_LOW_MM`/`MODERATE_MM`/`HEAVY_MM`/`EXTREME_MM` are IMD's real
+  category boundaries; the `RAINFALL_FACTOR_AT_*` weather_factor values at
+  each boundary are demo-legible choices, not calibrated against any
+  ground-truth disruption outcome (none exists yet).
+
+---
+
+## Part 11: landslide + flood HAZARD ZONATION layers
+
+**Important distinction, kept separate throughout this part:**
+
+| Concept | Answers | Where it lives |
+|---|---|---|
+| Historical landslide inventory (Part 4, GSI) | "Where have landslides been OBSERVED?" | `RoadSegment.historical_landslide_count`/`nearest_landslide_distance_m` |
+| Landslide hazard **zonation**/susceptibility (Part 11) | "Which areas are MORE PRONE?" | `RoadSegment.landslide_hazard_class`/`landslide_hazard_score` |
+| Flood hazard zonation (Part 11) | "Which areas are exposed to flooding?" | `RoadSegment.flood_hazard_class`/`flood_hazard_score` |
+
+Part 11 never reads or writes the GSI historical fields, and Part 4's
+`landslide_mapper.py` never reads or writes Part 11's fields.
+
+### Source and verified access status
+
+**Primary official source**: Arunachal Pradesh State Remote Sensing
+Application Centre (APSAC/SRSAC) --
+https://www.srsac.arunachal.gov.in/admin/geospatial.html (mirror:
+`.../geospatial.php`). The catalogue lists a Landslide Hazard Zonation Map
+(1:50K state-wide; a large-scale 1:10K zonation specifically for **Tawang,
+West Kameng, East Kameng, Pakke-Kessang, Papumpare** -- this project's own
+corridor districts) and a Flood Hazard Zonation Map (1:25K, state-wide).
+
+**Both live pages were checked directly** at Part 11 implementation time.
+Neither offers a direct download link, button, or machine-readable file --
+both require submitting a manual data request (an email address /
+"Submit Data Request" contact-form workflow). The 1:10K district-level
+landslide zonation was itself listed as "Database will be ready by June,
+2024" on the catalogue page, i.e. not yet published even for request at
+that time.
+
+**Consequence: no official APSAC hazard-zonation file has been downloaded,
+and none is bundled with this repository.** This is documented honestly
+rather than fabricated, per this project's data-integrity rules. Every
+`landslide_hazard_score`/`flood_hazard_score` in the running application is
+therefore `None` (`no_coverage`) for every real segment today -- never a
+fabricated 0.0/"low".
+
+### Architecture (mirrors the DEM/GSI split)
+
+- `app/data/hazard_layer_loader.py` -- generic point-query interface
+  (`get_landslide_hazard(lat, lon)`/`get_flood_hazard(lat, lon)`) over a
+  polygon layer, format-agnostic at the call site. Only the vector/polygon
+  path is implemented (via geopandas point-in-polygon) -- raster support
+  was deliberately not built speculatively, since the official source's
+  real format could not be verified (see that module's docstring for the
+  full reasoning). `HAZARD_CLASS_TO_SCORE`/`HAZARD_LEVEL_THRESHOLDS`
+  (`app/config.py`) map a source layer's own class string (e.g. `"High"`)
+  to a normalized `[0,1]` score and a display bucket -- the standard
+  NDMA/BIS-style Very Low/Low/Moderate/High/Very High vocabulary, not an
+  APSAC-specific invented scale, and not fitted to any real APSAC file
+  (none obtained). If a real file's own vocabulary differs, update that
+  table to match it.
+- `app/core/hazard_layer_service.py` -- samples a segment's REAL geometry
+  at 5 points (start/25%/50%/75%/end --
+  `HAZARD_SEGMENT_SAMPLE_FRACTIONS`, via `core/geo.py::interpolate_along_path`,
+  the same real-polyline walker Part 9's vehicle simulation uses) and
+  aggregates by **conservative maximum** across whichever samples have real
+  coverage -- never diluted by averaging with a safer point elsewhere on
+  the same segment, and never fabricated as `no_coverage`'s opposite when
+  even one sample IS covered.
+- `app/data/hazard_layer_mapper.py` -- offline pipeline (mirrors
+  `landslide_mapper.py`) that runs the above over every real segment and
+  writes `derived/road_hazard_layer_features.csv`. **Not run/committed**
+  for this delivery -- with no official layer loaded, it would only
+  produce 2,964 rows of `no_coverage`/empty, which adds no information and
+  risks looking like a real dataset sits behind it.
+- `network_loader.py::_maybe_enrich_with_hazard_layer_features` -- merges
+  that CSV onto `RoadSegment` at load time, exactly like the GSI features
+  merge. Since the CSV doesn't exist, this is always a no-op today --
+  segments simply keep their honest default (`None`).
+- **Expected drop-in location for a real file**:
+  `backend/app/data/hazard_layers/landslide_hazard_zonation.<ext>` /
+  `flood_hazard_zonation.<ext>` (any `geopandas.read_file()`-supported
+  format/CRS) -- see that directory's own `README.md` for the exact
+  drop-in + re-run steps. No other code needs to change.
+
+### Risk-engine integration (the smallest defensible change)
+
+The existing formula is **unchanged**:
+
+```
+risk_score = 0.35*slope_risk + 0.35*historical_landslide_risk + 0.20*weather_risk + 0.10*incident_risk
+```
+
+`historical_landslide_risk()` (`core/risk_engine.py`) now blends in
+`landslide_hazard_score` via **MAX, not sum**: historical GSI evidence and
+zonation susceptibility are correlated evidence for the *same* hazard
+(landslides), so adding their weights would double-count a segment where
+both agree, while MAX reports whichever real signal is currently worse
+without inventing a statistically fused number neither source was
+calibrated against. No new weight was introduced, and
+`RiskBreakdown.historical_landslide_risk`'s field name is unchanged. When
+`landslide_hazard_score` is `None` (its value for every real segment
+today), this is **exactly** the pre-Part-11 formula -- verified directly
+(`tests/test_hazard_layer.py::test_historical_landslide_risk_unchanged_when_no_hazard_layer`).
+
+`flood_hazard_score` is **deliberately NOT wired into `risk_score`** in
+this part -- the existing formula has no flood-shaped slot to fold it into
+without either introducing a new weight (shrinking an existing one, i.e.
+quietly recalibrating the formula) or misusing an unrelated component's
+public field name. It is exposed as informational segment/API data only
+(`GET /hazards/segments/{id}`), the same honest pre-scoring state
+`flood_susceptibility` has held since Part 2 -- a clean seam for a future
+deliberate weighting decision once real flood-zonation data exists. See
+`core/risk_engine.py`'s `FLOOD_HAZARD_NOTE` for the full reasoning.
+
+### API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /hazards/layers` | provenance/availability of both zonation layers + corridor-wide real-coverage counts |
+| `GET /hazards/segments/{id}` | one segment's landslide/flood hazard-zonation result (static, precomputed) + historical GSI fields for convenience |
+
+Both are additive to the existing `/hazards` router (Part 8's simulated
+hazard-event endpoints) -- neither changes any existing endpoint's
+behavior. `GET /segments/{id}` (Part 2/3, unchanged) also now includes the
+new `RoadSegment` fields automatically, since they're just model fields.
+
+### Dashboard
+
+`MapView.jsx`'s existing segment popups now also show
+`landslide_hazard_class`/`flood_hazard_class` (from the already-loaded
+network payload, zero extra requests) alongside the existing slope/
+historical-landslide display. A new `SegmentDetailPanel` component fetches
+`GET /hazards/segments/{id}` + `GET /weather/segments/{id}` for a single
+clicked segment (not all 2,964 -- click-driven, not eager) to show the
+full combined picture: slope, historical landslides, landslide hazard,
+flood hazard, rainfall, weather factor, and overall risk score in one
+place.
+
+### Validation (`cd backend && python -m app.data.hazard_layer_validation`)
+
+Reports dataset provenance, the verified access status above, the
+class->score mapping, corridor coverage (currently 0/2,964 for both hazard
+types), and live query results at all 7 named locations (all
+`no_coverage`, honestly). Explicitly prints: *"Official production layer
+not locally available; spatial lookup validated using synthetic test
+geometries only."*
+
+### Limitations
+
+- No official APSAC landslide or flood hazard-zonation file has been
+  obtained -- this is the single largest limitation of this part. Every
+  `landslide_hazard_score`/`flood_hazard_score` in the running application
+  is currently `None`.
+- `tests/test_hazard_layer.py`'s polygons are synthetic unit-test fixtures
+  only, never read by the running application, never real Arunachal
+  Pradesh data.
+- No raster hazard-layer support was built (see
+  `hazard_layer_loader.py`'s module docstring) -- the official source's
+  real file format is unknown since it could not be accessed.
+- `HAZARD_CLASS_TO_SCORE`'s specific numeric anchors are demo-legible
+  choices over a standard classification vocabulary, not calibrated
+  against any real APSAC file (none exists locally to calibrate against).
+- `flood_hazard_score` does not yet influence `risk_score` -- informational
+  only (see above).
+
+---
+
 ## History: the Part 2/3 OSRM-derived single-chain dataset
 
 The original dataset (Part 2/3) was a hand-picked chain of exactly 7 towns

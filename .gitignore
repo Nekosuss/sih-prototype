@@ -7,3 +7,4 @@ dist/
 .env
 backend/scripts/_fetched_cache/
 .pytest_cache/
+backend/app/data/rainfall_cache/

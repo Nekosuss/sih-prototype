@@ -1,33 +1,44 @@
 import { useState } from "react";
 
-const panelStyle = {
-  position: "absolute",
-  top: "1rem",
-  left: "1rem",
-  zIndex: 1000,
-  background: "white",
-  border: "1px solid #ddd",
-  borderRadius: "6px",
-  padding: "0.75rem 1rem",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-  fontSize: "0.85rem",
-  width: "220px",
-};
-
-export default function RoutePlanner({ nodes, route, alternativeRoutesAvailable, error, loading, onCalculate }) {
+// Route-planning controls: origin/destination + a mode selector between the
+// two REAL backend endpoints (see api/client.js) — no routing logic lives
+// here, this component only collects input and calls onCalculate.
+export default function RoutePlanner({ nodes, mode, onModeChange, loading, error, onCalculate }) {
   const [origin, setOrigin] = useState(nodes[0]?.id ?? "");
   const [destination, setDestination] = useState(nodes[nodes.length - 1]?.id ?? "");
 
   return (
-    <div style={panelStyle}>
-      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Plan a route</div>
+    <div className="panel">
+      <div className="panel__title">Route Planner</div>
 
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        Origin
+      <div className="mode-toggle">
+        <button
+          type="button"
+          className={`mode-toggle__option${mode === "fastest" ? " mode-toggle__option--active" : ""}`}
+          onClick={() => onModeChange("fastest")}
+          title="Shortest travel time only, no hazard/risk weighting"
+        >
+          Fastest
+        </button>
+        <button
+          type="button"
+          className={`mode-toggle__option${mode === "risk-aware" ? " mode-toggle__option--active" : ""}`}
+          onClick={() => onModeChange("risk-aware")}
+          title="Weighs terrain, historical landslides, weather, and incidents against travel time"
+        >
+          Risk-aware
+        </button>
+      </div>
+
+      <div className="field-group">
+        <label className="field-label" htmlFor="origin-select">
+          Origin
+        </label>
         <select
+          id="origin-select"
+          className="field-select"
           value={origin}
           onChange={(e) => setOrigin(e.target.value)}
-          style={{ display: "block", width: "100%", marginTop: "0.15rem" }}
         >
           {nodes.map((n) => (
             <option key={n.id} value={n.id}>
@@ -35,14 +46,17 @@ export default function RoutePlanner({ nodes, route, alternativeRoutesAvailable,
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        Destination
+      <div className="field-group">
+        <label className="field-label" htmlFor="destination-select">
+          Destination
+        </label>
         <select
+          id="destination-select"
+          className="field-select"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          style={{ display: "block", width: "100%", marginTop: "0.15rem" }}
         >
           {nodes.map((n) => (
             <option key={n.id} value={n.id}>
@@ -50,30 +64,18 @@ export default function RoutePlanner({ nodes, route, alternativeRoutesAvailable,
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
       <button
+        type="button"
+        className="btn-primary"
         onClick={() => onCalculate(origin, destination)}
         disabled={loading || origin === destination}
-        style={{ width: "100%", padding: "0.4rem 0", fontWeight: 600, cursor: "pointer" }}
       >
-        {loading ? "CALCULATING…" : "CALCULATE ROUTE"}
+        {loading ? "Calculating…" : "Calculate route"}
       </button>
 
-      {error && <p style={{ color: "#b00020", marginTop: "0.5rem" }}>{error}</p>}
-
-      {route && !error && (
-        <div style={{ marginTop: "0.6rem", lineHeight: 1.5 }}>
-          <div>Distance: {route.total_distance_km} km</div>
-          <div>ETA: {Math.round(route.estimated_travel_time_min)} min</div>
-          <div>Segments: {route.segment_ids.length}</div>
-          <div style={{ marginTop: "0.4rem", color: "#888", fontSize: "0.75rem" }}>
-            {alternativeRoutesAvailable
-              ? "Alternative route available."
-              : "No alternative route is currently available for this origin/destination pair."}
-          </div>
-        </div>
-      )}
+      {error && <div className="form-error">{error}</div>}
     </div>
   );
 }

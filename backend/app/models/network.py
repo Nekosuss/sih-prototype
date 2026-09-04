@@ -125,6 +125,29 @@ class RoadSegment(BaseModel):
     historical_landslide_count: int = 0
     nearest_landslide_distance_m: Optional[float] = None
 
+    # Part 11: landslide/flood HAZARD ZONATION (susceptibility) from an
+    # official spatial layer -- see app/data/hazard_layer_loader.py for the
+    # "historical occurrence vs. susceptibility zonation" distinction and
+    # this project's verified APSAC/SRSAC data-access status. Deliberately
+    # SEPARATE fields from historical_landslide_count/nearest_landslide_distance_m
+    # above (never overwritten by this) and from the older Part 2
+    # landslide_susceptibility/flood_susceptibility placeholders below
+    # (also never overwritten -- those remain the pre-Part-11 uniformly-0.0
+    # "not assessed" fields). None means "no official zonation layer
+    # currently covers this segment" -- NEVER coerced to a fabricated
+    # 0.0/"low". *_class preserves the source layer's own class string
+    # verbatim (e.g. "High"); *_score is that class mapped through
+    # app/config.py::HAZARD_CLASS_TO_SCORE to a normalized [0,1] value.
+    landslide_hazard_class: Optional[str] = None
+    landslide_hazard_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    flood_hazard_class: Optional[str] = None
+    flood_hazard_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    # Per-hazard-type provenance string (e.g. "real: APSAC landslide hazard
+    # zonation"), populated only for whichever of the two above is actually
+    # non-None -- parallel to the generic `source` dict below but kept
+    # separate since it's specific to Part 11's two hazard-layer fields.
+    hazard_layer_source: dict[str, str] = Field(default_factory=dict)
+
     # OSM way id(s) this segment was built from (a simplified/consolidated
     # edge can represent more than one original way). Empty for any segment
     # not sourced from OSM.
