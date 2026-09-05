@@ -1,0 +1,179 @@
+{
+  "random_forest_impurity_importance": [
+    {
+      "feature": "elevation_m",
+      "importance": 0.270082308290531
+    },
+    {
+      "feature": "slope_deg",
+      "importance": 0.22677367811242763
+    },
+    {
+      "feature": "terrain_type_plain",
+      "importance": 0.14844506979544997
+    },
+    {
+      "feature": "distance_km",
+      "importance": 0.1255965649664304
+    },
+    {
+      "feature": "terrain_type_mountain",
+      "importance": 0.052243491063510186
+    },
+    {
+      "feature": "rainy_days_count",
+      "importance": 0.04277055134455805
+    },
+    {
+      "feature": "monsoon_jun_sep_rainfall_mm",
+      "importance": 0.04087519168902828
+    },
+    {
+      "feature": "max_daily_rainfall_mm",
+      "importance": 0.02851968664989974
+    },
+    {
+      "feature": "annual_rainfall_mm",
+      "importance": 0.025297398723414462
+    },
+    {
+      "feature": "road_type_trunk",
+      "importance": 0.008746935129506613
+    },
+    {
+      "feature": "nearest_historical_landslide_distance_m_prior",
+      "importance": 0.007397146839290331
+    },
+    {
+      "feature": "has_prior_history",
+      "importance": 0.006548749545799324
+    },
+    {
+      "feature": "historical_landslide_count_prior",
+      "importance": 0.0062841297398142605
+    },
+    {
+      "feature": "road_type_tertiary",
+      "importance": 0.003998841307335975
+    },
+    {
+      "feature": "road_type_secondary",
+      "importance": 0.002955540879369172
+    },
+    {
+      "feature": "terrain_type_hill",
+      "importance": 0.0017408211555168755
+    },
+    {
+      "feature": "road_type_primary",
+      "importance": 0.0015721004269725124
+    },
+    {
+      "feature": "road_type_trunk_link",
+      "importance": 0.00010747965428496068
+    },
+    {
+      "feature": "road_type_primary_link",
+      "importance": 2.844812843963304e-05
+    },
+    {
+      "feature": "road_type_tertiary_link",
+      "importance": 1.0315134389313248e-05
+    },
+    {
+      "feature": "road_type_secondary_link",
+      "importance": 5.551424031175135e-06
+    }
+  ],
+  "logistic_regression_standardized_coefficients": [
+    {
+      "feature": "historical_landslide_count_prior",
+      "coefficient": -2.937091423538791
+    },
+    {
+      "feature": "monsoon_jun_sep_rainfall_mm",
+      "coefficient": 2.2787290619910117
+    },
+    {
+      "feature": "annual_rainfall_mm",
+      "coefficient": -1.9721006925713285
+    },
+    {
+      "feature": "road_type_primary",
+      "coefficient": 1.9373658054477705
+    },
+    {
+      "feature": "road_type_secondary",
+      "coefficient": -1.8355110847869922
+    },
+    {
+      "feature": "has_prior_history",
+      "coefficient": 1.8183134948205082
+    },
+    {
+      "feature": "elevation_m",
+      "coefficient": 1.71191535907773
+    },
+    {
+      "feature": "nearest_historical_landslide_distance_m_prior",
+      "coefficient": 0.9649129233971209
+    },
+    {
+      "feature": "distance_km",
+      "coefficient": 0.884872805174792
+    },
+    {
+      "feature": "road_type_trunk",
+      "coefficient": 0.5212276753954646
+    },
+    {
+      "feature": "max_daily_rainfall_mm",
+      "coefficient": -0.40064327355202184
+    },
+    {
+      "feature": "rainy_days_count",
+      "coefficient": -0.3488418905953164
+    },
+    {
+      "feature": "road_type_tertiary_link",
+      "coefficient": -0.34646879022172833
+    },
+    {
+      "feature": "terrain_type_plain",
+      "coefficient": -0.31773674968415794
+    },
+    {
+      "feature": "road_type_trunk_link",
+      "coefficient": -0.29887194182909504
+    },
+    {
+      "feature": "terrain_type_hill",
+      "coefficient": 0.23445161827731978
+    },
+    {
+      "feature": "terrain_type_mountain",
+      "coefficient": 0.2224527705858708
+    },
+    {
+      "feature": "road_type_primary_link",
+      "coefficient": -0.20566339078791457
+    },
+    {
+      "feature": "road_type_tertiary",
+      "coefficient": -0.18016284201225582
+    },
+    {
+      "feature": "road_type_secondary_link",
+      "coefficient": -0.15955004385867652
+    },
+    {
+      "feature": "slope_deg",
+      "coefficient": 0.14388281622842994
+    }
+  ],
+  "caveats": [
+    "Random Forest importances are impurity-based: biased toward high-cardinality/continuous features, and reflect correlation, not causation.",
+    "Logistic Regression coefficients are in STANDARDIZED-feature units and are NOT reliably interpretable at this sample size -- see MODEL_CARD.md; the largest-magnitude coefficient (historical_landslide_count_prior) has a sign that does not support a causal reading and is a known multicollinearity artifact.",
+    "Neither model's importances support a causal claim about what 'causes' landslides."
+  ]
+}

@@ -9,3 +9,5 @@ geopandas
 shapely
 numpy
 scipy
+scikit-learn
+joblib

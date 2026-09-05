@@ -408,6 +408,178 @@ def test_get_unknown_vehicle_returns_404(client):
     assert resp.status_code == 404
 
 
+# ---------------------------------------------------------------------------
+# Part 15C: GET /segments/{id}/ml-risk -- isolated, advisory ML risk signal
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def ml_enabled(monkeypatch):
+    """Enables the ML risk signal for the duration of one test only.
+    ML_RISK_ENABLED is False everywhere else in this suite (the shipped
+    default) -- monkeypatch guarantees it reverts even if the test fails."""
+    import app.config as config
+    from app.core import ml_risk_signal
+
+    monkeypatch.setattr(config, "ML_RISK_ENABLED", True)
+    ml_risk_signal.clear_artifact_cache()
+    yield
+    ml_risk_signal.clear_artifact_cache()
+
+
+def _first_segment_with_ml_features(client) -> str:
+    """A real segment with non-null slope_deg/elevation_m -- required for
+    the ML service to produce available=True (see ml_risk_signal.py)."""
+    segments = client.get("/segments").json()
+    return next(s["id"] for s in segments if s["slope_deg"] is not None and s["elevation_m"] is not None)
+
+
+def test_ml_risk_endpoint_disabled_by_default_returns_clean_unavailable(client):
+    seg_id = client.get("/segments").json()[0]["id"]
+    resp = client.get(f"/segments/{seg_id}/ml-risk")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["available"] is False
+    assert body["score"] is None
+    assert body["model_version"] is None
+    assert "disabled" in body["reason"].lower()
+
+
+def test_ml_risk_endpoint_unknown_segment_returns_404(client):
+    resp = client.get("/segments/does_not_exist/ml-risk")
+    assert resp.status_code == 404
+
+
+def test_ml_risk_endpoint_enabled_real_segment_real_model(client, ml_enabled):
+    """The primary happy-path test -- NOT mocked: a real corridor segment
+    scored by the real saved v2 (17-feature) Random Forest."""
+    seg_id = _first_segment_with_ml_features(client)
+    resp = client.get(f"/segments/{seg_id}/ml-risk")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["available"] is True
+    assert body["reason"] == "ok"
+    assert body["score"] is not None
+    assert 0.0 <= body["score"] <= 1.0
+    note = body["methodology_note"].lower()
+    assert "probability" in note and "not" in note
+    assert "calibrated" in note
+
+
+def test_ml_risk_endpoint_returns_model_version(client, ml_enabled):
+    seg_id = _first_segment_with_ml_features(client)
+    body = client.get(f"/segments/{seg_id}/ml-risk").json()
+    assert body["model_version"] == "part15a_segment_year_v2_17feature"
+
+
+def test_ml_risk_endpoint_returns_feature_schema_version(client, ml_enabled):
+    seg_id = _first_segment_with_ml_features(client)
+    body = client.get(f"/segments/{seg_id}/ml-risk").json()
+    assert isinstance(body["feature_schema_version"], str)
+    assert len(body["feature_schema_version"]) > 0
+
+
+def test_ml_risk_endpoint_deterministic_across_repeated_requests(client, ml_enabled):
+    seg_id = _first_segment_with_ml_features(client)
+    first = client.get(f"/segments/{seg_id}/ml-risk").json()
+    second = client.get(f"/segments/{seg_id}/ml-risk").json()
+    assert first["score"] == second["score"]
+    assert first["model_version"] == second["model_version"]
+    assert first["feature_schema_version"] == second["feature_schema_version"]
+
+
+def test_ml_risk_endpoint_artifact_unavailable_returns_clean_unavailable(client, ml_enabled, monkeypatch, tmp_path):
+    import app.config as config
+    from app.core import ml_risk_signal
+
+    monkeypatch.setattr(config, "ML_ARTIFACT_DIR", tmp_path / "missing_artifact_dir")
+    ml_risk_signal.clear_artifact_cache()
+
+    seg_id = client.get("/segments").json()[0]["id"]
+    resp = client.get(f"/segments/{seg_id}/ml-risk")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["available"] is False
+    assert body["score"] is None
+    assert "unavailable" in body["reason"].lower()
+
+
+def test_ml_risk_endpoint_never_asserts_score_is_a_probability(client, ml_enabled):
+    """The exact wording rule (Part 15C section 3): any mention of
+    "probability" in the response must be a NEGATION ("NOT a calibrated
+    probability"), never an assertion that the score IS one -- same
+    convention already enforced for /routes/calculate-risk-aware's
+    `reasons` in test_calculate_risk_aware_route above."""
+    seg_id = _first_segment_with_ml_features(client)
+    body = client.get(f"/segments/{seg_id}/ml-risk").json()
+
+    banned_positive_claims = [
+        "probability of landslide", "percentage chance", "likelihood percentage", "chance of landslide",
+    ]
+    full_text = str(body).lower()
+    for phrase in banned_positive_claims:
+        assert phrase not in full_text
+
+    assert "probability" not in full_text or "not a calibrated probability" in full_text
+
+
+def test_existing_route_calculation_unaffected_by_ml_risk_endpoint_disabled(client):
+    """Regression protection (ML disabled, the shipped default): calling
+    the new endpoint must not change subsequent route-calculation output
+    in any way -- risk scores, route segments, distance, travel time, or
+    the reported safety outcome."""
+    before = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+
+    for seg_id in before["fastest_route"]["segment_ids"][:20]:
+        client.get(f"/segments/{seg_id}/ml-risk")
+
+    after = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+
+    assert before["outcome"] == after["outcome"]
+    assert before["fastest_route"]["segment_ids"] == after["fastest_route"]["segment_ids"]
+    assert before["fastest_route"]["total_distance_km"] == after["fastest_route"]["total_distance_km"]
+    assert before["fastest_route"]["estimated_travel_time_min"] == after["fastest_route"]["estimated_travel_time_min"]
+    assert before["fastest_route_risk"]["aggregate_risk_score"] == after["fastest_route_risk"]["aggregate_risk_score"]
+    assert before["fastest_route_segment_risks"] == after["fastest_route_segment_risks"]
+    if before["recommended_route"] is not None:
+        assert before["recommended_route"]["segment_ids"] == after["recommended_route"]["segment_ids"]
+        assert before["recommended_route_risk"] == after["recommended_route_risk"]
+
+
+def test_existing_route_calculation_unaffected_by_ml_risk_endpoint_enabled(client, ml_enabled):
+    """Same regression check, but with ML_RISK_ENABLED=True and the ML
+    endpoint actually invoked (real model, real segments) -- confirms
+    even a SUCCESSFUL ML inference call has no effect on routing/risk."""
+    before = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+
+    for seg_id in before["fastest_route"]["segment_ids"][:20]:
+        client.get(f"/segments/{seg_id}/ml-risk")
+
+    after = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+
+    assert before["outcome"] == after["outcome"]
+    assert before["fastest_route"]["segment_ids"] == after["fastest_route"]["segment_ids"]
+    assert before["fastest_route"]["total_distance_km"] == after["fastest_route"]["total_distance_km"]
+    assert before["fastest_route"]["estimated_travel_time_min"] == after["fastest_route"]["estimated_travel_time_min"]
+    assert before["fastest_route_risk"]["aggregate_risk_score"] == after["fastest_route_risk"]["aggregate_risk_score"]
+    assert before["fastest_route_segment_risks"] == after["fastest_route_segment_risks"]
+
+
+def test_existing_segment_risk_endpoints_unaffected_by_ml_risk_endpoint(client, ml_enabled):
+    seg_id = _first_segment_with_ml_features(client)
+
+    risk_before = client.get(f"/segments/{seg_id}/risk").json()
+    risk_aware_before = client.get(f"/segments/{seg_id}/risk-aware").json()
+
+    client.get(f"/segments/{seg_id}/ml-risk")
+
+    risk_after = client.get(f"/segments/{seg_id}/risk").json()
+    risk_aware_after = client.get(f"/segments/{seg_id}/risk-aware").json()
+
+    assert risk_before == risk_after
+    assert risk_aware_before == risk_aware_after
+
+
 def test_vehicle_reroutes_around_real_hazard_ahead(client, clean_hazards):
     """End-to-end Part 8+9 integration via the real HTTP API."""
     import time
@@ -425,3 +597,129 @@ def test_vehicle_reroutes_around_real_hazard_ahead(client, clean_hazards):
     polled = client.get(f"/vehicles/{created['id']}").json()
     assert polled["status"] in ("rerouting", "en_route")
     assert not (set(polled["current_route"]["segment_ids"]) & set(affected))
+
+
+# ---------------------------------------------------------------------------
+# Part 15E: routing/reroute isolation regression -- the architectural
+# guarantee that GET /segments/{id}/ml-risk (Part 15C) and ML_RISK_ENABLED
+# (Part 15B) have ZERO effect on route calculation or hazard-driven
+# rerouting, proven with a real A/B comparison inside ONE test (same
+# TestClient/app instance, ML flag flipped mid-test via monkeypatch) rather
+# than just asserting "nothing changed after enabling ML" in isolation.
+# ---------------------------------------------------------------------------
+
+
+def _without_route_id(route):
+    """Strips the two fields that legitimately differ between any two
+    otherwise-identical route calculations regardless of ML state: a
+    random route_id (uuid4, see app/models/route.py) and its created_at
+    wall-clock timestamp. Everything else must match exactly."""
+    if route is None:
+        return None
+    return {k: v for k, v in route.items() if k not in ("route_id", "created_at")}
+
+
+def test_route_calculation_identical_ml_disabled_vs_enabled(client, monkeypatch):
+    """Section 10's routing isolation regression: the SAME
+    /routes/calculate-risk-aware call, once with ML_RISK_ENABLED=False and
+    once with it genuinely True (and the ML endpoint actually exercised for
+    every segment on the route in between), must produce byte-identical
+    route geometry, segment_ids, distance, ETA, aggregate/per-segment risk
+    scores, risk levels, and safety outcome -- only route_id (a random
+    UUID per calculation, unrelated to ML) is excluded from the diff."""
+    import app.config as config
+    from app.core import ml_risk_signal
+
+    monkeypatch.setattr(config, "ML_RISK_ENABLED", False)
+    disabled = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+
+    monkeypatch.setattr(config, "ML_RISK_ENABLED", True)
+    ml_risk_signal.clear_artifact_cache()
+    for seg_id in disabled["fastest_route"]["segment_ids"][:30]:
+        resp = client.get(f"/segments/{seg_id}/ml-risk")
+        assert resp.status_code == 200
+        assert resp.json()["available"] is True  # confirm ML actually ran, not silently skipped
+
+    enabled = client.post("/routes/calculate-risk-aware", json={"origin": "Guwahati", "destination": "Tawang"}).json()
+    ml_risk_signal.clear_artifact_cache()
+
+    assert disabled["outcome"] == enabled["outcome"]
+    assert disabled["safer_alternative_selected"] == enabled["safer_alternative_selected"]
+    assert disabled["unsafe_segments_in_fastest_route"] == enabled["unsafe_segments_in_fastest_route"]
+    assert _without_route_id(disabled["fastest_route"]) == _without_route_id(enabled["fastest_route"])
+    assert disabled["fastest_route_risk"] == enabled["fastest_route_risk"]
+    assert disabled["fastest_route_segment_risks"] == enabled["fastest_route_segment_risks"]
+    assert _without_route_id(disabled["recommended_route"]) == _without_route_id(enabled["recommended_route"])
+    assert disabled["recommended_route_risk"] == enabled["recommended_route_risk"]
+    assert disabled["recommended_route_segment_risks"] == enabled["recommended_route_segment_risks"]
+    assert disabled["reasons"] == enabled["reasons"]
+
+
+def test_reroute_decision_identical_ml_disabled_vs_enabled(client, clean_hazards, monkeypatch):
+    """Section 11's reroute isolation regression: repeats the real
+    hazard -> reroute scenario (same as
+    test_evaluate_disruption_real_corridor_reroutes_after_hazard above)
+    once with ML disabled and once with it enabled and actually queried,
+    and confirms the REROUTE decision is identical either way. Each run
+    creates its own hazard (a fresh random id/timestamp each time, by
+    design -- see app/models/hazard.py), so `active_hazard_ids` and the
+    two runs' own route_ids are excluded from the diff; everything that
+    should be decision-relevant is compared exactly."""
+    import app.config as config
+    from app.core import ml_risk_signal
+
+    on_route = [s["id"] for s in client.get("/segments").json() if s["name"] == "Doimara-Nichiphu"]
+    assert on_route
+
+    def run_scenario():
+        baseline = client.post("/routes/evaluate-disruption", json={"origin": "Bhalukpong", "destination": "Bomdila"}).json()
+        hazard = client.post(
+            "/hazards/simulate",
+            json={"type": "road_blockage", "severity": "blocking", "affected_segment_ids": on_route},
+        ).json()
+        disrupted = client.post(
+            "/routes/evaluate-disruption",
+            json={
+                "origin": "Bhalukpong",
+                "destination": "Bomdila",
+                "previous_route_id": baseline["recommended_route"]["route_id"],
+            },
+        ).json()
+        client.post(f"/hazards/{hazard['id']}/clear")
+        return baseline, disrupted
+
+    monkeypatch.setattr(config, "ML_RISK_ENABLED", False)
+    baseline_disabled, disrupted_disabled = run_scenario()
+
+    monkeypatch.setattr(config, "ML_RISK_ENABLED", True)
+    ml_risk_signal.clear_artifact_cache()
+    for seg_id in on_route:
+        resp = client.get(f"/segments/{seg_id}/ml-risk")
+        assert resp.json()["available"] is True
+    baseline_enabled, disrupted_enabled = run_scenario()
+    ml_risk_signal.clear_artifact_cache()
+
+    assert baseline_disabled["outcome"] == baseline_enabled["outcome"] == "continue"
+    assert disrupted_disabled["outcome"] == disrupted_enabled["outcome"] == "reroute"
+
+    assert _without_route_id(disrupted_disabled["recommended_route"]) == _without_route_id(disrupted_enabled["recommended_route"])
+    assert disrupted_disabled["recommended_route_risk"] == disrupted_enabled["recommended_route_risk"]
+    assert disrupted_disabled["affected_segment_ids"] == disrupted_enabled["affected_segment_ids"] == sorted(on_route)
+    assert disrupted_disabled["eta_change_min"] == disrupted_enabled["eta_change_min"]
+    assert disrupted_disabled["reason"] == disrupted_enabled["reason"]
+
+
+def test_ml_risk_lookup_does_not_mutate_state_store(client, ml_enabled):
+    """Confirms fetching the ML signal is read-only at the StateStore
+    level too, not just "the next route calculation happens to match":
+    the real, live segment objects (which routing_engine.build_graph()
+    reads current_risk_score/etc. from) are unchanged after the call."""
+    from app.store.state_store import state_store
+
+    segment_id = _first_segment_with_ml_features(client)
+    before = state_store.get_segment(segment_id).model_dump()
+
+    client.get(f"/segments/{segment_id}/ml-risk")
+
+    after = state_store.get_segment(segment_id).model_dump()
+    assert before == after

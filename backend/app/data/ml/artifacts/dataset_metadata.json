@@ -1,0 +1,31 @@
+{
+  "dataset_path": "app/data/derived/segment_year_dataset.csv",
+  "dataset_sha256": "ee6cb8279d51aab6cb0ee1a3e454ce4f3f6deb155f7ab3d009a6dfc1ea616d76",
+  "row_count": 32604,
+  "n_segments": 2964,
+  "n_years": 11,
+  "years": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "label_status_counts": {
+    "unobserved": 32574,
+    "event": 30
+  },
+  "n_positive_rows": 30,
+  "n_positive_segments": 29,
+  "n_positive_way_groups": 25,
+  "positive_years": [
+    2016,
+    2021
+  ]
+}

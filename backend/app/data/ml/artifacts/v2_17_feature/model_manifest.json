@@ -1,0 +1,96 @@
+{
+  "experiment_id": "part15a_segment_year_v2_17feature",
+  "part": "15A",
+  "generated_at_utc": "2026-09-05T08:49:28.535265+00:00",
+  "git_commit": "375f06056d7e93d6535f8ba57a064bab6179cdb9",
+  "sklearn_version": "1.9.0",
+  "prototype_disclaimer": "PROTOTYPE ARTIFACT -- NOT production-calibrated. Model scores are NOT calibrated probabilities of a landslide occurring. See MODEL_CARD.md.",
+  "version_relationship": {
+    "predecessor": "part14_segment_year_v1 (21-feature, includes 4 rainfall aggregates)",
+    "predecessor_location": "backend/app/data/ml/artifacts/ (unchanged, not overwritten)",
+    "this_version": "part15a_segment_year_v2_17feature (17-feature, no rainfall)",
+    "why_a_new_version_exists": "Part 15's production feature-parity audit found the 4 rainfall aggregate features in v1 are full-calendar-year quantities that cannot be honestly computed at inference time in production (no live rainfall feed, and an annual total is a hindsight quantity for an in-progress year). This version answers 'what does removing them cost' empirically -- see ml_feature_parity_part15a.md for the decision this supports."
+  },
+  "models": {
+    "random_forest": {
+      "file": "random_forest_model.joblib",
+      "sklearn_class": "sklearn.ensemble.RandomForestClassifier"
+    },
+    "logistic_regression": {
+      "file": "logistic_regression_model.joblib",
+      "sklearn_class": "sklearn.pipeline.Pipeline (StandardScaler + LogisticRegression)",
+      "preprocessing_file": "logistic_regression_scaler.joblib"
+    }
+  },
+  "training_dataset": {
+    "dataset_path": "app/data/derived/segment_year_dataset.csv",
+    "dataset_sha256": "ee6cb8279d51aab6cb0ee1a3e454ce4f3f6deb155f7ab3d009a6dfc1ea616d76",
+    "note": "SAME underlying dataset CSV as v1 -- only the feature matrix (columns used) differs.",
+    "row_count": 32604,
+    "n_segments": 2964,
+    "n_years": 11,
+    "years": [
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "label_status_counts": {
+      "unobserved": 32574,
+      "event": 30
+    },
+    "n_positive_rows": 30,
+    "n_positive_segments": 29,
+    "n_positive_way_groups": 25,
+    "positive_years": [
+      2016,
+      2021
+    ]
+  },
+  "feature_schema_file": "feature_schema.json",
+  "feature_names_in_order": [
+    "distance_km",
+    "slope_deg",
+    "elevation_m",
+    "historical_landslide_count_prior",
+    "nearest_historical_landslide_distance_m_prior",
+    "has_prior_history",
+    "road_type_primary",
+    "road_type_primary_link",
+    "road_type_secondary",
+    "road_type_secondary_link",
+    "road_type_tertiary",
+    "road_type_tertiary_link",
+    "road_type_trunk",
+    "road_type_trunk_link",
+    "terrain_type_hill",
+    "terrain_type_mountain",
+    "terrain_type_plain"
+  ],
+  "model_config_file": "model_config.json",
+  "validation_metadata_file": "validation_metadata.json",
+  "feature_importance_file": "feature_importance.json",
+  "validation_strategy": "leave-one-way-group-out, grouped by OSM way_id (25 independent positive groups) -- identical to v1",
+  "reported_metrics": {
+    "logistic_regression_within_terrain_mean_percentile": 74.91708616316618,
+    "random_forest_within_terrain_mean_percentile": 75.594805881767,
+    "logistic_regression_pooled_auc": 0.9648659101744493,
+    "random_forest_pooled_auc": 0.9755003895124293,
+    "note": "LOGO out-of-fold estimates from 25 transient per-fold models, NOT the saved final models' own in-sample score -- identical caveat to v1."
+  },
+  "known_limitations": [
+    "Same 25-independent-positive-group sample-size limitation as v1 -- unchanged by removing rainfall features.",
+    "Same reporting/observation-location bias as v1 (unresolved, inherited from the underlying GSI data).",
+    "Same absence of any confirmed-negative label as v1.",
+    "Loses the (already coarse, contemporaneous-not-pre-event) rainfall signal v1 had -- trades a small amount of Random Forest ranking quality (see comparison_to_v1 in validation_metadata.json) for features that are honestly computable in production."
+  ],
+  "conclusion": "See ml_feature_parity_part15a.md for the full decision. This artifact set exists to make that decision with real numbers, not to declare production-readiness -- the MODEL_CARD.md 'Not intended for' list applies identically to this version.",
+  "production_integration_status": "NOT integrated. Not imported by app/core, app/api, or app/simulation."
+}

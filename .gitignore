@@ -8,3 +8,10 @@ dist/
 backend/scripts/_fetched_cache/
 .pytest_cache/
 backend/app/data/rainfall_cache/
+
+# Part 14: full 11-year IMD gridded-rainfall NetCDF archive (~271MB) used
+# by app/data/ml/rainfall_archive_loader.py -- deliberately kept out of
+# version control, same reasoning as rainfall_cache/ above. Re-fetch via
+# the same source rainfall_archive_loader.py's docstring documents
+# (IMD's Rainfall_25_NetCDF product) rather than committing it.
+/data/

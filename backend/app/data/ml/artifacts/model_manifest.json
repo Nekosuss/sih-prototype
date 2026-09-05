@@ -1,0 +1,95 @@
+{
+  "experiment_id": "part14_segment_year_v1",
+  "part": "14.4",
+  "generated_at_utc": "2026-09-05T08:20:17.001383+00:00",
+  "git_commit": "375f06056d7e93d6535f8ba57a064bab6179cdb9",
+  "sklearn_version": "1.9.0",
+  "prototype_disclaimer": "PROTOTYPE ARTIFACT -- NOT production-calibrated. Model scores are NOT calibrated probabilities of a landslide occurring. See MODEL_CARD.md.",
+  "models": {
+    "random_forest": {
+      "file": "random_forest_model.joblib",
+      "sklearn_class": "sklearn.ensemble.RandomForestClassifier"
+    },
+    "logistic_regression": {
+      "file": "logistic_regression_model.joblib",
+      "sklearn_class": "sklearn.pipeline.Pipeline (StandardScaler + LogisticRegression)",
+      "preprocessing_file": "logistic_regression_scaler.joblib"
+    }
+  },
+  "training_dataset": {
+    "dataset_path": "app/data/derived/segment_year_dataset.csv",
+    "dataset_sha256": "ee6cb8279d51aab6cb0ee1a3e454ce4f3f6deb155f7ab3d009a6dfc1ea616d76",
+    "row_count": 32604,
+    "n_segments": 2964,
+    "n_years": 11,
+    "years": [
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "label_status_counts": {
+      "unobserved": 32574,
+      "event": 30
+    },
+    "n_positive_rows": 30,
+    "n_positive_segments": 29,
+    "n_positive_way_groups": 25,
+    "positive_years": [
+      2016,
+      2021
+    ]
+  },
+  "feature_schema_file": "feature_schema.json",
+  "feature_names_in_order": [
+    "distance_km",
+    "slope_deg",
+    "elevation_m",
+    "historical_landslide_count_prior",
+    "nearest_historical_landslide_distance_m_prior",
+    "has_prior_history",
+    "annual_rainfall_mm",
+    "monsoon_jun_sep_rainfall_mm",
+    "max_daily_rainfall_mm",
+    "rainy_days_count",
+    "road_type_primary",
+    "road_type_primary_link",
+    "road_type_secondary",
+    "road_type_secondary_link",
+    "road_type_tertiary",
+    "road_type_tertiary_link",
+    "road_type_trunk",
+    "road_type_trunk_link",
+    "terrain_type_hill",
+    "terrain_type_mountain",
+    "terrain_type_plain"
+  ],
+  "model_config_file": "model_config.json",
+  "validation_metadata_file": "validation_metadata.json",
+  "feature_importance_file": "feature_importance.json",
+  "validation_strategy": "leave-one-way-group-out, grouped by OSM way_id (25 independent positive groups)",
+  "reported_metrics": {
+    "logistic_regression_within_terrain_mean_percentile": 72.93720580247198,
+    "random_forest_within_terrain_mean_percentile": 78.63330420288142,
+    "logistic_regression_pooled_auc": 0.9539921932641141,
+    "random_forest_pooled_auc": 0.9810827140291798,
+    "note": "These are LOGO out-of-fold estimates from 25 transient per-fold models (see logo_evaluation.py), NOT the in-sample score of the SAVED final models above -- the saved models were fit on all 25 positive groups and have no honest held-out score of their own. Never report the saved model's own training-data score as if it were the generalization estimate."
+  },
+  "known_limitations": [
+    "Only 25 independent positive way-groups -- any validation metric here carries wide, unquantified uncertainty.",
+    "Reporting/observation-location bias is unresolved (Part 14 inspection): events cluster in the high-mountain section, which may reflect survey effort as much as genuine hazard.",
+    "non_event_documented is empty -- there is no confirmed-negative signal in this dataset at all; every comparison is against 'unobserved', never 'safe'.",
+    "Rainfall features are contemporaneous with the label year, not strictly pre-event, for 24 of 30 event rows (only 2016 events have a day-precise date).",
+    "0.25-degree rainfall grid is far coarser than road-segment spacing.",
+    "Logistic Regression coefficients are unstable/multicollinear at this sample size."
+  ],
+  "conclusion_from_part_14_3": "ML PROTOTYPE POSSIBLE BUT NOT RELIABLE FOR PRODUCTION",
+  "production_integration_status": "NOT integrated. Not imported by app/core, app/api, or app/simulation."
+}

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 # Tunable constants for the risk/routing logic. Kept in one place so the
 # scoring and routing behavior stays easy to explain and adjust for a demo.
 #
@@ -338,3 +340,42 @@ FIELD_REPORT_INCIDENT_TO_HAZARD_TYPE = {
 # precision of trusting only the midpoint, the same reasoning
 # ROUTE_AGGREGATE_MAX_WEIGHT already applies at the route level above.
 HAZARD_SEGMENT_SAMPLE_FRACTIONS = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+# --- Part 15B: ML risk signal (isolated, advisory-only inference service) ---
+#
+# Purely additive. Nothing above this line is read, renamed, or reweighted
+# by any of the constants below. app/core/ml_risk_signal.py checks
+# ML_RISK_ENABLED FIRST, before touching any file or model -- when False
+# (the default), that module never attempts to load an artifact at all, so
+# existing risk/routing/hazard/reroute behavior is completely unaffected.
+# risk_engine.py, routing_engine.py, reroute_service.py, and hazard_state.py
+# do not import this section and are not modified by it. See
+# backend/app/data/ml/ml_integration_design_part15.md (architecture) and
+# ml_feature_parity_part15a.md (why v2/17-feature, not v1/21-feature) for
+# the full design history behind these values.
+
+ML_RISK_ENABLED = False
+
+# The v2 (17-feature, no rainfall) artifact directory -- ml_feature_parity_
+# part15a.md's Section 5 decision: v1's 4 rainfall-aggregate features
+# cannot be honestly computed at inference time, so v2 is the only
+# artifact set this service ever loads. Resolved relative to this file
+# (app/config.py), not the process's current working directory.
+ML_ARTIFACT_DIR = Path(__file__).resolve().parent / "data" / "ml" / "artifacts" / "v2_17_feature"
+
+# Must equal the loaded artifact's model_manifest.json::experiment_id
+# exactly. ml_risk_signal.py refuses to serve a signal (falls back to an
+# explicit "unavailable" MLRiskSignal) on any mismatch, rather than
+# silently trusting a swapped or incompatible artifact directory.
+ML_EXPECTED_EXPERIMENT_ID = "part15a_segment_year_v2_17feature"
+
+# RoadSegment.historical_landslide_count / nearest_landslide_distance_m
+# (lifetime, no year filter) are used as a proxy for the model's "prior to
+# this year" historical features (ml_feature_parity_part15a.md, features
+# #4/#5) -- an equivalence that only holds for an as_of_date strictly
+# after every year the training dataset's rainfall archive covers
+# (2015-2025, see artifacts/v2_17_feature/dataset_metadata.json).
+# ml_risk_signal.py refuses to produce a signal for an as_of_date at or
+# before this year rather than silently reusing the proxy outside the
+# window it was justified for.
+ML_HISTORICAL_PROXY_VALID_FROM_YEAR = 2026

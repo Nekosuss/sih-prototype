@@ -141,6 +141,17 @@ export function getSegmentHazardLayers(segmentId) {
   return getJson(`/hazards/segments/${segmentId}`);
 }
 
+// --- Part 15C/15D: advisory ML risk signal (backend/app/core/ml_risk_signal.py) ---
+// An ISOLATED, experimental ranking signal from an uncalibrated prototype
+// model -- purely informational, has ZERO effect on risk_score, routing,
+// hazard state, or PROCEED/REROUTE/SUSPEND. `available: false` (e.g. ML is
+// disabled -- the default -- or the model/artifact is unavailable) is a
+// normal 200 response shape, not an error; only an unknown segment_id
+// raises (404, surfaced as a thrown Error like every other getJson call).
+export function getSegmentMlRisk(segmentId) {
+  return getJson(`/segments/${segmentId}/ml-risk`);
+}
+
 // --- Part 12: field reporting / incident intelligence ---
 // Real (prototype) field-worker-submitted incident reports -- GPS-matched to
 // the nearest real OSM road segment and fed into the SAME hazard/risk/

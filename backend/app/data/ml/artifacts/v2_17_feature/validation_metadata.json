@@ -1,0 +1,876 @@
+{
+  "validation_strategy": "leave-one-way-group-out (LOGO), grouped by OSM way_id -- IDENTICAL protocol to v1",
+  "n_positive_way_groups": 25,
+  "logistic_regression": {
+    "n_folds": 38,
+    "pooled_auc": 0.9648659101744493,
+    "full_population_percentile_mean": 96.81085304354002,
+    "within_terrain_percentile_mean": 74.91708616316618,
+    "within_terrain_percentile_median": 77.1356783919598,
+    "within_terrain_percentile_min": 29.285714285714285,
+    "within_terrain_percentile_max": 99.9443413729128,
+    "folds": [
+      {
+        "held_out_way_id": "1112682378",
+        "held_out_segment_ids": [
+          "seg_1112682378_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.6646423751687,
+        "within_terrain_percentile_rank": 52.01005025125628
+      },
+      {
+        "held_out_way_id": "1113108547",
+        "held_out_segment_ids": [
+          "seg_1113108547_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.20445344129554,
+        "within_terrain_percentile_rank": 60.050251256281406
+      },
+      {
+        "held_out_way_id": "1168516993",
+        "held_out_segment_ids": [
+          "seg_1168516993_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.44062078272604,
+        "within_terrain_percentile_rank": 62.06030150753769
+      },
+      {
+        "held_out_way_id": "1172016260",
+        "held_out_segment_ids": [
+          "seg_1172016260_0",
+          "seg_1172016260_1"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.7132253711201,
+        "within_terrain_percentile_rank": 96.23115577889448
+      },
+      {
+        "held_out_way_id": "1172016260",
+        "held_out_segment_ids": [
+          "seg_1172016260_0",
+          "seg_1172016260_1"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.19500674763833,
+        "within_terrain_percentile_rank": 78.14070351758794
+      },
+      {
+        "held_out_way_id": "1217478195",
+        "held_out_segment_ids": [
+          "seg_1217478195_0"
+        ],
+        "year": 2016,
+        "terrain_type": "plain",
+        "percentile_rank": 89.08569500674764,
+        "within_terrain_percentile_rank": 97.82931354359926
+      },
+      {
+        "held_out_way_id": "1217478195",
+        "held_out_segment_ids": [
+          "seg_1217478195_0"
+        ],
+        "year": 2021,
+        "terrain_type": "plain",
+        "percentile_rank": 91.78475033738192,
+        "within_terrain_percentile_rank": 99.72170686456401
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.0600539811066,
+        "within_terrain_percentile_rank": 87.85714285714286
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 96.60931174089069,
+        "within_terrain_percentile_rank": 69.28571428571429
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 96.84547908232119,
+        "within_terrain_percentile_rank": 75.0
+      },
+      {
+        "held_out_way_id": "238491033",
+        "held_out_segment_ids": [
+          "seg_238491033_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.7132253711201,
+        "within_terrain_percentile_rank": 96.23115577889448
+      },
+      {
+        "held_out_way_id": "238491396",
+        "held_out_segment_ids": [
+          "seg_238491396_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.83603238866397,
+        "within_terrain_percentile_rank": 85.678391959799
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.38529014844805,
+        "within_terrain_percentile_rank": 70.10050251256281
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.29352226720648,
+        "within_terrain_percentile_rank": 48.994974874371856
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.57827260458839,
+        "within_terrain_percentile_rank": 94.72361809045226
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.34885290148448,
+        "within_terrain_percentile_rank": 39.447236180904525
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.9804318488529,
+        "within_terrain_percentile_rank": 67.58793969849246
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.9251012145749,
+        "within_terrain_percentile_rank": 76.63316582914572
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.46221322537112,
+        "within_terrain_percentile_rank": 51.50753768844221
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.3974358974359,
+        "within_terrain_percentile_rank": 80.65326633165829
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.77800269905534,
+        "within_terrain_percentile_rank": 65.57788944723617
+      },
+      {
+        "held_out_way_id": "238560159",
+        "held_out_segment_ids": [
+          "seg_238560159_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.30836707152497,
+        "within_terrain_percentile_rank": 91.70854271356784
+      },
+      {
+        "held_out_way_id": "238560167",
+        "held_out_segment_ids": [
+          "seg_238560167_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 97.52024291497976,
+        "within_terrain_percentile_rank": 86.42857142857143
+      },
+      {
+        "held_out_way_id": "238560178",
+        "held_out_segment_ids": [
+          "seg_238560178_1"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 94.21390013495277,
+        "within_terrain_percentile_rank": 57.857142857142854
+      },
+      {
+        "held_out_way_id": "238560178",
+        "held_out_segment_ids": [
+          "seg_238560178_1"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 95.15856950067476,
+        "within_terrain_percentile_rank": 60.714285714285715
+      },
+      {
+        "held_out_way_id": "284662840",
+        "held_out_segment_ids": [
+          "seg_284662840_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.9493927125506,
+        "within_terrain_percentile_rank": 99.2462311557789
+      },
+      {
+        "held_out_way_id": "288458015",
+        "held_out_segment_ids": [
+          "seg_288458015_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.10593792172739,
+        "within_terrain_percentile_rank": 89.19597989949749
+      },
+      {
+        "held_out_way_id": "288458018",
+        "held_out_segment_ids": [
+          "seg_288458018_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.54183535762483,
+        "within_terrain_percentile_rank": 64.07035175879398
+      },
+      {
+        "held_out_way_id": "311848756",
+        "held_out_segment_ids": [
+          "seg_311848756_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.52968960863697,
+        "within_terrain_percentile_rank": 50.50251256281407
+      },
+      {
+        "held_out_way_id": "44736738",
+        "held_out_segment_ids": [
+          "seg_44736738_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.36369770580296,
+        "within_terrain_percentile_rank": 90.71428571428571
+      },
+      {
+        "held_out_way_id": "540412989",
+        "held_out_segment_ids": [
+          "seg_540412989_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.19500674763833,
+        "within_terrain_percentile_rank": 77.63819095477388
+      },
+      {
+        "held_out_way_id": "560851692",
+        "held_out_segment_ids": [
+          "seg_560851692_0",
+          "seg_560851692_1"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.97098515519568,
+        "within_terrain_percentile_rank": 87.1859296482412
+      },
+      {
+        "held_out_way_id": "560851692",
+        "held_out_segment_ids": [
+          "seg_560851692_0",
+          "seg_560851692_1"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.95883940620783,
+        "within_terrain_percentile_rank": 76.13065326633166
+      },
+      {
+        "held_out_way_id": "565306892",
+        "held_out_segment_ids": [
+          "seg_565306892_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.88191632928475,
+        "within_terrain_percentile_rank": 98.24120603015075
+      },
+      {
+        "held_out_way_id": "565307022",
+        "held_out_segment_ids": [
+          "seg_565307022_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 86.58906882591093,
+        "within_terrain_percentile_rank": 29.285714285714285
+      },
+      {
+        "held_out_way_id": "777399946",
+        "held_out_segment_ids": [
+          "seg_777399946_0"
+        ],
+        "year": 2021,
+        "terrain_type": "plain",
+        "percentile_rank": 98.1612685560054,
+        "within_terrain_percentile_rank": 99.9443413729128
+      },
+      {
+        "held_out_way_id": "884729744",
+        "held_out_segment_ids": [
+          "seg_884729744_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.32995951417004,
+        "within_terrain_percentile_rank": 79.64824120603015
+      },
+      {
+        "held_out_way_id": "972662965",
+        "held_out_segment_ids": [
+          "seg_972662965_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.73211875843455,
+        "within_terrain_percentile_rank": 53.015075376884425
+      }
+    ]
+  },
+  "random_forest": {
+    "n_folds": 38,
+    "pooled_auc": 0.9755003895124293,
+    "full_population_percentile_mean": 97.18508061652108,
+    "within_terrain_percentile_mean": 75.594805881767,
+    "within_terrain_percentile_median": 86.30473797559225,
+    "within_terrain_percentile_min": 25.376884422110553,
+    "within_terrain_percentile_max": 99.9443413729128,
+    "folds": [
+      {
+        "held_out_way_id": "1112682378",
+        "held_out_segment_ids": [
+          "seg_1112682378_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.76855600539811,
+        "within_terrain_percentile_rank": 85.17587939698493
+      },
+      {
+        "held_out_way_id": "1113108547",
+        "held_out_segment_ids": [
+          "seg_1113108547_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.6336032388664,
+        "within_terrain_percentile_rank": 83.66834170854271
+      },
+      {
+        "held_out_way_id": "1168516993",
+        "held_out_segment_ids": [
+          "seg_1168516993_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.35155195681511,
+        "within_terrain_percentile_rank": 69.09547738693468
+      },
+      {
+        "held_out_way_id": "1172016260",
+        "held_out_segment_ids": [
+          "seg_1172016260_0",
+          "seg_1172016260_1"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.90350877192982,
+        "within_terrain_percentile_rank": 87.1859296482412
+      },
+      {
+        "held_out_way_id": "1172016260",
+        "held_out_segment_ids": [
+          "seg_1172016260_0",
+          "seg_1172016260_1"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.39271255060729,
+        "within_terrain_percentile_rank": 91.95979899497488
+      },
+      {
+        "held_out_way_id": "1217478195",
+        "held_out_segment_ids": [
+          "seg_1217478195_0"
+        ],
+        "year": 2016,
+        "terrain_type": "plain",
+        "percentile_rank": 90.97503373819163,
+        "within_terrain_percentile_rank": 99.53617810760667
+      },
+      {
+        "held_out_way_id": "1217478195",
+        "held_out_segment_ids": [
+          "seg_1217478195_0"
+        ],
+        "year": 2021,
+        "terrain_type": "plain",
+        "percentile_rank": 92.08839406207828,
+        "within_terrain_percentile_rank": 99.87012987012987
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.93724696356276,
+        "within_terrain_percentile_rank": 95.0
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.22874493927125,
+        "within_terrain_percentile_rank": 86.42857142857143
+      },
+      {
+        "held_out_way_id": "157598093",
+        "held_out_segment_ids": [
+          "seg_157598093_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.73481781376518,
+        "within_terrain_percentile_rank": 90.71428571428571
+      },
+      {
+        "held_out_way_id": "238491033",
+        "held_out_segment_ids": [
+          "seg_238491033_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.57827260458839,
+        "within_terrain_percentile_rank": 93.71859296482413
+      },
+      {
+        "held_out_way_id": "238491396",
+        "held_out_segment_ids": [
+          "seg_238491396_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.98313090418354,
+        "within_terrain_percentile_rank": 99.74874371859296
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.9493927125506,
+        "within_terrain_percentile_rank": 99.2462311557789
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.60188933873144,
+        "within_terrain_percentile_rank": 42.71356783919598
+      },
+      {
+        "held_out_way_id": "238496656",
+        "held_out_segment_ids": [
+          "seg_238496656_2"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.28407557354926,
+        "within_terrain_percentile_rank": 67.08542713567839
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.41632928475033,
+        "within_terrain_percentile_rank": 39.949748743718594
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.57827260458839,
+        "within_terrain_percentile_rank": 93.71859296482413
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.40958164642375,
+        "within_terrain_percentile_rank": 91.70854271356784
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.34885290148448,
+        "within_terrain_percentile_rank": 38.94472361809045
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.54453441295547,
+        "within_terrain_percentile_rank": 93.21608040201005
+      },
+      {
+        "held_out_way_id": "238496657",
+        "held_out_segment_ids": [
+          "seg_238496657_1",
+          "seg_238496657_2",
+          "seg_238496657_4"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.84817813765183,
+        "within_terrain_percentile_rank": 97.73869346733669
+      },
+      {
+        "held_out_way_id": "238560159",
+        "held_out_segment_ids": [
+          "seg_238560159_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.61201079622133,
+        "within_terrain_percentile_rank": 94.22110552763819
+      },
+      {
+        "held_out_way_id": "238560167",
+        "held_out_segment_ids": [
+          "seg_238560167_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 98.80229419703105,
+        "within_terrain_percentile_rank": 92.14285714285714
+      },
+      {
+        "held_out_way_id": "238560178",
+        "held_out_segment_ids": [
+          "seg_238560178_1"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 93.70782726045884,
+        "within_terrain_percentile_rank": 40.714285714285715
+      },
+      {
+        "held_out_way_id": "238560178",
+        "held_out_segment_ids": [
+          "seg_238560178_1"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 96.06950067476383,
+        "within_terrain_percentile_rank": 77.85714285714286
+      },
+      {
+        "held_out_way_id": "284662840",
+        "held_out_segment_ids": [
+          "seg_284662840_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 97.89136302294197,
+        "within_terrain_percentile_rank": 73.61809045226131
+      },
+      {
+        "held_out_way_id": "288458015",
+        "held_out_segment_ids": [
+          "seg_288458015_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.80229419703105,
+        "within_terrain_percentile_rank": 86.18090452261306
+      },
+      {
+        "held_out_way_id": "288458018",
+        "held_out_segment_ids": [
+          "seg_288458018_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.54453441295547,
+        "within_terrain_percentile_rank": 93.21608040201005
+      },
+      {
+        "held_out_way_id": "311848756",
+        "held_out_segment_ids": [
+          "seg_311848756_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.38259109311741,
+        "within_terrain_percentile_rank": 38.94472361809045
+      },
+      {
+        "held_out_way_id": "44736738",
+        "held_out_segment_ids": [
+          "seg_44736738_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 93.84278002699055,
+        "within_terrain_percentile_rank": 39.285714285714285
+      },
+      {
+        "held_out_way_id": "540412989",
+        "held_out_segment_ids": [
+          "seg_540412989_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 98.73481781376518,
+        "within_terrain_percentile_rank": 84.17085427135679
+      },
+      {
+        "held_out_way_id": "560851692",
+        "held_out_segment_ids": [
+          "seg_560851692_0",
+          "seg_560851692_1"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 99.27462887989203,
+        "within_terrain_percentile_rank": 90.20100502512562
+      },
+      {
+        "held_out_way_id": "560851692",
+        "held_out_segment_ids": [
+          "seg_560851692_0",
+          "seg_560851692_1"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 93.33670715249663,
+        "within_terrain_percentile_rank": 25.376884422110553
+      },
+      {
+        "held_out_way_id": "565306892",
+        "held_out_segment_ids": [
+          "seg_565306892_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 96.71052631578948,
+        "within_terrain_percentile_rank": 59.54773869346734
+      },
+      {
+        "held_out_way_id": "565307022",
+        "held_out_segment_ids": [
+          "seg_565307022_0"
+        ],
+        "year": 2021,
+        "terrain_type": "hill",
+        "percentile_rank": 94.71997300944669,
+        "within_terrain_percentile_rank": 43.57142857142857
+      },
+      {
+        "held_out_way_id": "777399946",
+        "held_out_segment_ids": [
+          "seg_777399946_0"
+        ],
+        "year": 2021,
+        "terrain_type": "plain",
+        "percentile_rank": 97.38529014844805,
+        "within_terrain_percentile_rank": 99.9443413729128
+      },
+      {
+        "held_out_way_id": "884729744",
+        "held_out_segment_ids": [
+          "seg_884729744_0"
+        ],
+        "year": 2021,
+        "terrain_type": "mountain",
+        "percentile_rank": 94.38259109311741,
+        "within_terrain_percentile_rank": 39.949748743718594
+      },
+      {
+        "held_out_way_id": "972662965",
+        "held_out_segment_ids": [
+          "seg_972662965_0"
+        ],
+        "year": 2016,
+        "terrain_type": "mountain",
+        "percentile_rank": 95.27665317139001,
+        "within_terrain_percentile_rank": 47.23618090452261
+      }
+    ]
+  },
+  "groupkfold5_diagnostic_random_forest": [
+    {
+      "fold_index": 0,
+      "n_train_positive_groups": 17,
+      "n_val_positive_groups": 8,
+      "n_val_rows": 6523,
+      "fold_auc": 0.9833749040675364,
+      "evaluable": true
+    },
+    {
+      "fold_index": 1,
+      "n_train_positive_groups": 20,
+      "n_val_positive_groups": 5,
+      "n_val_rows": 6523,
+      "fold_auc": 0.9860237328013912,
+      "evaluable": true
+    },
+    {
+      "fold_index": 2,
+      "n_train_positive_groups": 22,
+      "n_val_positive_groups": 3,
+      "n_val_rows": 6523,
+      "fold_auc": 0.9786590978827862,
+      "evaluable": true
+    },
+    {
+      "fold_index": 3,
+      "n_train_positive_groups": 19,
+      "n_val_positive_groups": 6,
+      "n_val_rows": 6523,
+      "fold_auc": 0.9545951650038373,
+      "evaluable": true
+    },
+    {
+      "fold_index": 4,
+      "n_train_positive_groups": 22,
+      "n_val_positive_groups": 3,
+      "n_val_rows": 6512,
+      "fold_auc": 0.9871716085420188,
+      "evaluable": true
+    }
+  ],
+  "baseline_comparison": {
+    "description": "Production risk_engine.assess_segment_risk(), unchanged -- same reference point used for v1.",
+    "full_population_mean_percentile": 94.76102114260009
+  },
+  "comparison_to_v1_21_feature": {
+    "v1_random_forest_within_terrain_mean_percentile": 78.63330420288142,
+    "v1_random_forest_pooled_auc": 0.9810827140291798,
+    "v1_logistic_regression_within_terrain_mean_percentile": 72.93720580247198,
+    "v1_logistic_regression_pooled_auc": 0.9539921932641141,
+    "v2_random_forest_within_terrain_mean_percentile": 75.594805881767,
+    "v2_random_forest_pooled_auc": 0.9755003895124293,
+    "v2_logistic_regression_within_terrain_mean_percentile": 74.91708616316618,
+    "v2_logistic_regression_pooled_auc": 0.9648659101744493,
+    "note": "v1 numbers are quoted from artifacts/model_manifest.json (Part 14.4), reproduced in this same process for the delta reported in ml_feature_parity_part15a.md. Random Forest loses a small amount of within-terrain ranking quality without rainfall; Logistic Regression does not. Both v2 models remain far above the 58.2 / AUC 0.535 rule-based baseline."
+  },
+  "note_on_reproducibility": "These numbers were produced by running feature_matrix_v2_17feature.py + the UNCHANGED models.py/logo_evaluation.py/ranking_evaluation.py/baseline_risk_scorer.py at artifact-save time -- see ml_feature_parity_part15a.md for the full investigation."
+}

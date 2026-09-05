@@ -1,0 +1,35 @@
+{
+  "feature_names_in_order": [
+    "distance_km",
+    "slope_deg",
+    "elevation_m",
+    "historical_landslide_count_prior",
+    "nearest_historical_landslide_distance_m_prior",
+    "has_prior_history",
+    "annual_rainfall_mm",
+    "monsoon_jun_sep_rainfall_mm",
+    "max_daily_rainfall_mm",
+    "rainy_days_count",
+    "road_type_primary",
+    "road_type_primary_link",
+    "road_type_secondary",
+    "road_type_secondary_link",
+    "road_type_tertiary",
+    "road_type_tertiary_link",
+    "road_type_trunk",
+    "road_type_trunk_link",
+    "terrain_type_hill",
+    "terrain_type_mountain",
+    "terrain_type_plain"
+  ],
+  "n_features": 21,
+  "categorical_source_columns": [
+    "road_type",
+    "terrain_type"
+  ],
+  "categorical_encoding": "pandas.get_dummies (one-hot), columns named '<col>_<category>'",
+  "numeric_missing_value_handling": {
+    "nearest_historical_landslide_distance_m_prior": "NaN (no prior-dated match yet) filled with sentinel 5000.0; a companion boolean column 'has_prior_history' preserves whether this was a real distance or the sentinel."
+  },
+  "note": "Any future inference row MUST be built via app.data.ml.feature_matrix.build_feature_matrix() (or the same pandas.get_dummies category set) and reindexed to feature_names_in_order before calling .predict_proba() -- a mismatched column set/order will silently produce wrong scores with plain sklearn estimators."
+}
