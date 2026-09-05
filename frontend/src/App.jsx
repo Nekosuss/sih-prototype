@@ -14,6 +14,7 @@ import VehiclePanel from "./components/VehiclePanel/VehiclePanel.jsx";
 import WeatherControls from "./components/WeatherControls/WeatherControls.jsx";
 import SegmentDetailPanel from "./components/SegmentDetailPanel/SegmentDetailPanel.jsx";
 import FieldReportPanel from "./components/FieldReportPanel/FieldReportPanel.jsx";
+import CorridorOverview from "./components/CorridorOverview/CorridorOverview.jsx";
 import { VEHICLE_STATUS_LABEL } from "./utils/risk.js";
 import { getNetwork, calculateRoute, calculateRiskAwareRoute, resetSimulation } from "./api/client.js";
 
@@ -29,40 +30,30 @@ export default function App() {
   const [network, setNetwork] = useState(null);
   const [networkError, setNetworkError] = useState(null);
 
+  // Active Workspace Navigation: "dispatch" | "command" | "field" | "lab"
+  const [activeWorkspace, setActiveWorkspace] = useState("dispatch");
+
   const [mode, setMode] = useState("risk-aware"); // "fastest" | "risk-aware"
-  const [fastestResult, setFastestResult] = useState(null); // { route, alternative_routes_available }
-  const [riskAwareResult, setRiskAwareResult] = useState(null); // RiskAwareRouteResult
+  const [cargoType, setCargoType] = useState("medical");
+  const [fastestResult, setFastestResult] = useState(null);
+  const [riskAwareResult, setRiskAwareResult] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
 
-  // Part 8/12: the most recent hazard-driven RouteDecision (continue/reroute/
-  // suspend) from either the demo hazard controls or a field report -- both
-  // funnel into this ONE slot, since they feed the same backend pipeline.
-  // TAKES OVER the map's route display and the decision banner while set --
-  // cleared whenever a fresh route is calculated.
+  // Dynamic hazard-driven RouteDecision (continue/reroute/suspend)
   const [hazardDecision, setHazardDecision] = useState(null);
 
-  // Part 9: the currently dispatched simulated vehicle (or null), reported
-  // up from VehiclePanel so the map can render its live position.
+  // Active simulated vehicle
   const [vehicle, setVehicle] = useState(null);
 
-  // Part 11: the currently clicked road segment (or null) -- drives
-  // SegmentDetailPanel's combined hazard/rainfall/risk fetch for just that
-  // ONE segment, never all ~2,964 at once.
+  // Clicked road segment for diagnostic inspection
   const [selectedSegment, setSelectedSegment] = useState(null); // { id, name } | null
 
-  // Part 12: field-worker incident reports. Map markers are sourced from
-  // AlertCenter's own poll (alertSummary.reports below) rather than a
-  // second independent fetch here -- one poll, not two (Step 23).
-  // `pickingLocation` + `pickedLocation` implement "USE MAP LOCATION" -- a
-  // click on the map hands its REAL coordinates back to the form, never a
-  // fabricated/rounded location.
+  // Field reporting coordinate picker
   const [pickingLocation, setPickingLocation] = useState(false);
   const [pickedLocation, setPickedLocation] = useState(null); // { lat, lng } | null
 
-  // Part 13: consolidated operational state -- what the Alert Center last
-  // saw (for the header's active-incident count), the session activity
-  // timeline, the Data Sources overlay, and Reset Demo's in-flight state.
+  // Operational alert summary & timeline
   const [alertSummary, setAlertSummary] = useState({ hazards: [], reports: [] });
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [dataSourcesOpen, setDataSourcesOpen] = useState(false);
@@ -77,14 +68,15 @@ export default function App() {
     );
   }
 
-  // Shared by HazardControl, FieldReportPanel, and AlertCenter -- every
-  // real source of a RouteDecision funnels through here so the decision
-  // banner/map/timeline stay consistent no matter which panel triggered it.
   function handleDecision(decision) {
     setHazardDecision(decision);
     if (decision) {
       const label =
-        decision.outcome === "suspend" ? "Dispatch suspended" : decision.outcome === "reroute" ? "Route rerouted" : "Route re-confirmed";
+        decision.outcome === "suspend"
+          ? "Dispatch suspended"
+          : decision.outcome === "reroute"
+          ? "Route rerouted"
+          : "Route re-confirmed";
       logEvent(label, decision.reason);
     }
   }
@@ -99,7 +91,10 @@ export default function App() {
   }
 
   function handleReportSubmitted(report) {
-    logEvent("Field report submitted", `${report.incident_type.replace("_", " ")} — ${report.segment_name || report.segment_id}`);
+    logEvent(
+      "Field report submitted",
+      `${report.incident_type.replace("_", " ")} — ${report.segment_name || report.segment_id}`
+    );
   }
 
   function handleReportResolved(report) {
@@ -127,11 +122,13 @@ export default function App() {
     setVehicle(null);
   }
 
-  async function handleCalculateRoute(origin, destination) {
+  async function handleCalculateRoute(origin, destination, selectedCargo) {
     setRouteLoading(true);
     setRouteError(null);
     setHazardDecision(null);
     setVehicle(null);
+    if (selectedCargo) setCargoType(selectedCargo);
+
     try {
       if (mode === "fastest") {
         const result = await calculateRoute(origin, destination);
@@ -142,7 +139,10 @@ export default function App() {
         setRiskAwareResult(result);
         setFastestResult(null);
       }
-      logEvent("Route calculated", `${origin} → ${destination} (${mode === "fastest" ? "fastest" : "risk-aware"})`);
+      logEvent(
+        "Convoy route planned",
+        `${origin} → ${destination} (${mode === "fastest" ? "fastest" : "risk-aware"})`
+      );
     } catch (e) {
       setFastestResult(null);
       setRiskAwareResult(null);
@@ -166,7 +166,7 @@ export default function App() {
       setPickedLocation(null);
       setAlertSummary({ hazards: [], reports: [] });
       setTimelineEvents([]);
-      logEvent("Demo reset", "Hazards, field reports, and vehicles cleared");
+      logEvent("Demo reset", "Hazards, field reports, and vehicles cleared to baseline");
     } catch (e) {
       setRouteError(e.message);
     } finally {
@@ -174,9 +174,6 @@ export default function App() {
     }
   }
 
-  // Normalize the two possible result shapes into one view model so the
-  // display components stay simple. Everything here is a plain lookup into
-  // real backend response fields -- no values are computed/invented here.
   let displayRoute = null;
   let routeTypeLabel = null;
   let riskProfile = null;
@@ -203,22 +200,26 @@ export default function App() {
     return map;
   }, [network]);
 
-  // Real segments on the currently displayed route only (never the whole
-  // network) -- for the hazard-simulation segment picker.
   const routeSegments = displayRoute
     ? displayRoute.segment_ids.map((id) => ({ id, name: segmentsById.get(id)?.name || null }))
-    : [];
+    : network?.segments.slice(0, 25).map((s) => ({ id: s.id, name: s.name })) || [];
 
   return (
     <div className="app-shell">
       <Header
+        activeWorkspace={activeWorkspace}
+        onWorkspaceChange={setActiveWorkspace}
         status={networkError ? "error" : network ? "operational" : "loading"}
         alertCount={activeAlertCount}
         onOpenDataSources={() => setDataSourcesOpen(true)}
         onResetDemo={handleResetDemo}
         resetting={resetting}
       />
+
       <div className="app-main">
+        {/* ==================================================================== */}
+        {/* LEFT RAIL: CONTEXTUAL TO ACTIVE WORKSPACE                             */}
+        {/* ==================================================================== */}
         <aside className="app-rail app-rail--left">
           {networkError && (
             <div className="form-error">
@@ -230,31 +231,93 @@ export default function App() {
 
           {network && (
             <>
-              <RoutePlanner
-                nodes={network.nodes.filter((n) => n.name)}
-                mode={mode}
-                onModeChange={handleModeChange}
-                loading={routeLoading}
-                error={routeError}
-                onCalculate={handleCalculateRoute}
-              />
+              {/* WORKSPACE 1: FLEET DISPATCH */}
+              {activeWorkspace === "dispatch" && (
+                <>
+                  <div className="workspace-banner">
+                    <div className="workspace-banner__title">🚚 Fleet &amp; Convoy Dispatch</div>
+                    <div className="workspace-banner__desc">
+                      Plan risk-weighted transport routes for essential commodities and dispatch monitored vehicles.
+                    </div>
+                  </div>
+                  <RoutePlanner
+                    nodes={network.nodes.filter((n) => n.name)}
+                    mode={mode}
+                    onModeChange={handleModeChange}
+                    loading={routeLoading}
+                    error={routeError}
+                    onCalculate={handleCalculateRoute}
+                  />
+                </>
+              )}
 
-              <WeatherControls />
+              {/* WORKSPACE 2: COMMAND CENTER */}
+              {activeWorkspace === "command" && (
+                <>
+                  <div className="workspace-banner">
+                    <div className="workspace-banner__title">🛡️ Regional Command Center</div>
+                    <div className="workspace-banner__desc">
+                      State &amp; District Disaster Management oversight: monitor regional bottlenecks and isolated sectors.
+                    </div>
+                  </div>
+                  <CorridorOverview
+                    activeAlertCount={activeAlertCount}
+                    highRainfallCount={0}
+                  />
+                  <WeatherControls />
+                </>
+              )}
 
-              {hasResult && (
-                <HazardControl
-                  key={displayRoute.route_id}
-                  routeSegments={routeSegments}
-                  origin={displayRoute.origin}
-                  destination={displayRoute.destination}
-                  currentRouteId={displayRoute.route_id}
-                  onDecision={handleDecision}
-                />
+              {/* WORKSPACE 3: FIELD REPORTING */}
+              {activeWorkspace === "field" && (
+                <>
+                  <div className="workspace-banner">
+                    <div className="workspace-banner__title">📍 Ground Field Reporting</div>
+                    <div className="workspace-banner__desc">
+                      Log road breaches, rockfalls, and bridge damage directly to the regional intelligence grid.
+                    </div>
+                  </div>
+                  <FieldReportPanel
+                    key={`field-report-${displayRoute?.route_id || "standalone"}`}
+                    origin={displayRoute?.origin}
+                    destination={displayRoute?.destination}
+                    currentRouteId={displayRoute?.route_id}
+                    pickedLocation={pickedLocation}
+                    onStartPicking={() => setPickingLocation(true)}
+                    onDecision={handleDecision}
+                    onReportSubmitted={handleReportSubmitted}
+                    onReportResolved={handleReportResolved}
+                  />
+                </>
+              )}
+
+              {/* WORKSPACE 4: SIMULATION LAB */}
+              {activeWorkspace === "lab" && (
+                <>
+                  <div className="workspace-banner">
+                    <div className="workspace-banner__title">🧪 Simulation &amp; Stress Lab</div>
+                    <div className="workspace-banner__desc">
+                      Simulate hypothetical landslides, severe precipitation, and evaluate dynamic rerouting decisions.
+                    </div>
+                  </div>
+                  <HazardControl
+                    key={`hazard-ctrl-${displayRoute?.route_id || "corridor"}`}
+                    routeSegments={routeSegments}
+                    origin={displayRoute?.origin || "Guwahati"}
+                    destination={displayRoute?.destination || "Tawang"}
+                    currentRouteId={displayRoute?.route_id}
+                    onDecision={handleDecision}
+                  />
+                  <WeatherControls />
+                </>
               )}
             </>
           )}
         </aside>
 
+        {/* ==================================================================== */}
+        {/* CENTER: SHARED INTERACTIVE MAP                                       */}
+        {/* ==================================================================== */}
         <div className="app-map">
           {network && (
             <MapView
@@ -272,9 +335,13 @@ export default function App() {
           )}
         </div>
 
+        {/* ==================================================================== */}
+        {/* RIGHT RAIL: CONTEXTUAL TO ACTIVE WORKSPACE                            */}
+        {/* ==================================================================== */}
         <aside className="app-rail app-rail--right">
           {network && (
             <>
+              {/* Selected Segment Inspection (Always accessible across any workspace) */}
               {selectedSegment && (
                 <SegmentDetailPanel
                   segmentId={selectedSegment.id}
@@ -283,55 +350,107 @@ export default function App() {
                 />
               )}
 
-              {hasResult && (
-                <AlertPanel riskAwareResult={mode === "risk-aware" ? riskAwareResult : null} hazardDecision={hazardDecision} />
-              )}
-
-              <AlertCenter
-                routeSegmentIds={displayRoute?.segment_ids}
-                origin={displayRoute?.origin}
-                destination={displayRoute?.destination}
-                currentRouteId={displayRoute?.route_id}
-                onDecision={handleDecision}
-                onChange={setAlertSummary}
-              />
-
-              {!hasResult && !routeLoading && (
-                <div className="empty-state" style={{ padding: "1.2rem 0.5rem" }}>
-                  Select an origin and destination to begin.
-                </div>
-              )}
-
-              {hasResult && (
+              {/* WORKSPACE 1: FLEET DISPATCH */}
+              {activeWorkspace === "dispatch" && (
                 <>
-                  <RouteSummary
-                    route={displayRoute}
-                    routeTypeLabel={routeTypeLabel}
-                    riskProfile={riskProfile}
-                    segmentRisks={segmentRisks}
-                    alternativeRoutesAvailable={alternativeRoutesAvailable}
-                  />
-                  {mode === "risk-aware" && riskAwareResult && <RouteComparison result={riskAwareResult} />}
-                  {mode === "risk-aware" && riskProfile && (
-                    <RiskBreakdown riskProfile={riskProfile} segmentRisks={segmentRisks} />
+                  {hasResult && (
+                    <AlertPanel
+                      riskAwareResult={mode === "risk-aware" ? riskAwareResult : null}
+                      hazardDecision={hazardDecision}
+                    />
                   )}
-                  <FieldReportPanel
-                    key={`field-report-${displayRoute.route_id}`}
-                    origin={displayRoute.origin}
-                    destination={displayRoute.destination}
-                    currentRouteId={displayRoute.route_id}
-                    pickedLocation={pickedLocation}
-                    onStartPicking={() => setPickingLocation(true)}
+
+                  {!hasResult && !routeLoading && (
+                    <div className="empty-state" style={{ padding: "1.4rem 0.6rem" }}>
+                      Select an origin, destination, and cargo priority on the left to compute the safest convoy route.
+                    </div>
+                  )}
+
+                  {hasResult && (
+                    <>
+                      <RouteSummary
+                        route={displayRoute}
+                        routeTypeLabel={routeTypeLabel}
+                        riskProfile={riskProfile}
+                        segmentRisks={segmentRisks}
+                        alternativeRoutesAvailable={alternativeRoutesAvailable}
+                      />
+                      {mode === "risk-aware" && riskAwareResult && <RouteComparison result={riskAwareResult} />}
+                      {mode === "risk-aware" && riskProfile && (
+                        <RiskBreakdown riskProfile={riskProfile} segmentRisks={segmentRisks} />
+                      )}
+                      <VehiclePanel
+                        key={`vehicle-${displayRoute.route_id}`}
+                        origin={displayRoute.origin}
+                        destination={displayRoute.destination}
+                        onVehicleUpdate={handleVehicleUpdate}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* WORKSPACE 2: COMMAND CENTER */}
+              {activeWorkspace === "command" && (
+                <>
+                  <AlertCenter
+                    routeSegmentIds={displayRoute?.segment_ids}
+                    origin={displayRoute?.origin}
+                    destination={displayRoute?.destination}
+                    currentRouteId={displayRoute?.route_id}
                     onDecision={handleDecision}
-                    onReportSubmitted={handleReportSubmitted}
-                    onReportResolved={handleReportResolved}
+                    onChange={setAlertSummary}
                   />
-                  <VehiclePanel
-                    key={`vehicle-${displayRoute.route_id}`}
-                    origin={displayRoute.origin}
-                    destination={displayRoute.destination}
-                    onVehicleUpdate={handleVehicleUpdate}
+                  {!selectedSegment && (
+                    <div className="empty-state" style={{ padding: "1.2rem 0.6rem" }}>
+                      Click any road segment on the central map to view real SRTM slope, elevation, GSI historical
+                      landslide frequency, and IMD rainfall.
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* WORKSPACE 3: FIELD REPORTING */}
+              {activeWorkspace === "field" && (
+                <>
+                  <AlertCenter
+                    routeSegmentIds={displayRoute?.segment_ids}
+                    origin={displayRoute?.origin}
+                    destination={displayRoute?.destination}
+                    currentRouteId={displayRoute?.route_id}
+                    onDecision={handleDecision}
+                    onChange={setAlertSummary}
                   />
+                </>
+              )}
+
+              {/* WORKSPACE 4: SIMULATION LAB */}
+              {activeWorkspace === "lab" && (
+                <>
+                  <AlertCenter
+                    routeSegmentIds={displayRoute?.segment_ids}
+                    origin={displayRoute?.origin}
+                    destination={displayRoute?.destination}
+                    currentRouteId={displayRoute?.route_id}
+                    onDecision={handleDecision}
+                    onChange={setAlertSummary}
+                  />
+                  <div className="panel">
+                    <div className="panel__title">Evaluation Sandbox Controls</div>
+                    <div className="methodology-note" style={{ marginTop: 0, borderTop: "none" }}>
+                      Use the left panel to inject dynamic road obstacles. Watch the system compute
+                      CONTINUE / REROUTE / SUSPEND decisions based on graph connectivity.
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={handleResetDemo}
+                      disabled={resetting}
+                      style={{ marginTop: "0.5rem" }}
+                    >
+                      {resetting ? "Resetting…" : "Reset Demo Baseline"}
+                    </button>
+                  </div>
                 </>
               )}
             </>

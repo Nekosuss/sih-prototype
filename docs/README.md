@@ -43,7 +43,12 @@ This documentation directory provides an exhaustive, unvarnished technical audit
    - Complete contract specification for all active REST endpoints (`/network`, `/routes`, `/hazards`, `/vehicles`, `/weather`, `/field-reports`, `/simulation`).
    - Pydantic schema dictionary and frontend component inventory (including cleanup notes for dead stubs).
 
-7. **[Production Roadmap & AI Engineering Blueprint (`PRODUCTION_ROADMAP_AND_AI_BLUEPRINT.md`)](PRODUCTION_ROADMAP_AND_AI_BLUEPRINT.md)**
+7. **[User Flows & Interface Architecture Design (`USER_FLOWS_AND_UI_ARCHITECTURE.md`)](USER_FLOWS_AND_UI_ARCHITECTURE.md)**
+   - Analysis of the current single-dashboard clutter and cognitive overload.
+   - Decoupled 4-workspace model (Regional Command, Fleet Dispatch, Mobile Field Reporting, and Simulation Lab).
+   - Step-by-step user journeys, sequence diagrams, and tabbed UI architecture.
+
+8. **[Production Roadmap & AI Engineering Blueprint (`PRODUCTION_ROADMAP_AND_AI_BLUEPRINT.md`)](PRODUCTION_ROADMAP_AND_AI_BLUEPRINT.md)**
    - Actionable step-by-step roadmap to graduate this single-corridor prototype into a 8-state production platform.
    - Database migration (PostgreSQL + PostGIS + pgRouting), real GPS integration (MQTT/Protobuf), Live Weather APIs (IMD/ECMWF), and Offline PWA architecture.
 
