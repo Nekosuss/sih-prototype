@@ -256,6 +256,66 @@ button {
   text-overflow: ellipsis;
 }
 
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.25rem 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #cfe3e8;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-tab--active {
+  color: #ffffff;
+  background: var(--color-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.nav-tab__icon {
+  font-size: 0.85rem;
+}
+
+.nav-tab__label {
+  letter-spacing: 0.02em;
+}
+
+.nav-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 0.3rem;
+  border-radius: 8px;
+  background: var(--status-high);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  margin-left: 0.15rem;
+}
+
 .app-header__status {
   display: flex;
   align-items: center;
@@ -1085,4 +1145,91 @@ a:focus-visible {
   margin-top: 0.4rem;
   color: #888;
   font-size: 0.72rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Station Checklist & Workspace Cards (Command / Field Workspaces)        */
+/* ---------------------------------------------------------------------- */
+
+.station-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.station-node-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.station-node-row:hover {
+  background: var(--color-surface-3);
+  border-color: var(--color-border-strong);
+}
+
+.station-node-row__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.station-node-row__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.station-node-row__district {
+  font-size: 0.68rem;
+  color: var(--color-ink-soft);
+}
+
+.station-node-row__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.station-node-row__elevation {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.station-node-row__role {
+  font-size: 0.62rem;
+  color: var(--color-ink-faint);
+}
+
+.workspace-banner {
+  padding: 0.6rem 0.8rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+}
+
+.workspace-banner__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.workspace-banner__desc {
+  font-size: 0.7rem;
+  color: var(--color-ink-soft);
+  margin-top: 0.2rem;
+  line-height: 1.35;
 }

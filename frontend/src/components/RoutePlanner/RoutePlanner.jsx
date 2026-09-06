@@ -1,15 +1,23 @@
 import { useState } from "react";
 
-// Route-planning controls: origin/destination + a mode selector between the
-// two REAL backend endpoints (see api/client.js) — no routing logic lives
-// here, this component only collects input and calls onCalculate.
+const CARGO_TYPES = [
+  { id: "medical", label: "Medicines & Cold-Chain Supplies", icon: "💊" },
+  { id: "rations", label: "Food Grains & Rations (FCI)", icon: "🌾" },
+  { id: "fuel", label: "Petroleum, Oil & Lubricants (POL)", icon: "⛽" },
+  { id: "construction", label: "Construction & Engineering Materials", icon: "🏗️" },
+  { id: "general", label: "General Essential Commodities", icon: "📦" },
+];
+
+// Route-planning controls: origin/destination + cargo priority + a mode selector
+// between the two REAL backend endpoints (see api/client.js).
 export default function RoutePlanner({ nodes, mode, onModeChange, loading, error, onCalculate }) {
   const [origin, setOrigin] = useState(nodes[0]?.id ?? "");
   const [destination, setDestination] = useState(nodes[nodes.length - 1]?.id ?? "");
+  const [cargoType, setCargoType] = useState(CARGO_TYPES[0].id);
 
   return (
     <div className="panel">
-      <div className="panel__title">Route Planner</div>
+      <div className="panel__title">Convoy Route Planner</div>
 
       <div className="mode-toggle">
         <button
@@ -26,13 +34,31 @@ export default function RoutePlanner({ nodes, mode, onModeChange, loading, error
           onClick={() => onModeChange("risk-aware")}
           title="Weighs terrain, historical landslides, weather, and incidents against travel time"
         >
-          Risk-aware
+          Risk-aware (Recommended)
         </button>
       </div>
 
       <div className="field-group">
+        <label className="field-label" htmlFor="cargo-select">
+          Cargo Type &amp; Priority
+        </label>
+        <select
+          id="cargo-select"
+          className="field-select"
+          value={cargoType}
+          onChange={(e) => setCargoType(e.target.value)}
+        >
+          {CARGO_TYPES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.icon} {c.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="field-group">
         <label className="field-label" htmlFor="origin-select">
-          Origin
+          Origin Dispatch Point
         </label>
         <select
           id="origin-select"
@@ -50,7 +76,7 @@ export default function RoutePlanner({ nodes, mode, onModeChange, loading, error
 
       <div className="field-group">
         <label className="field-label" htmlFor="destination-select">
-          Destination
+          Destination Station
         </label>
         <select
           id="destination-select"
@@ -69,10 +95,10 @@ export default function RoutePlanner({ nodes, mode, onModeChange, loading, error
       <button
         type="button"
         className="btn-primary"
-        onClick={() => onCalculate(origin, destination)}
+        onClick={() => onCalculate(origin, destination, cargoType)}
         disabled={loading || origin === destination}
       >
-        {loading ? "Calculating…" : "Calculate route"}
+        {loading ? "Calculating Safest Route…" : "Plan Convoy Route"}
       </button>
 
       {error && <div className="form-error">{error}</div>}
