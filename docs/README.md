@@ -44,7 +44,6 @@ This documentation directory provides an exhaustive, unvarnished technical audit
 ```
 sih-prototype/
 ├── PROBLEM_STATEMENT.md                     # Canonical Problem Statement 26002 (Do Not Modify)
-├── COMPREHENSIVE_PS_STAKEHOLDER_USP_ANALYSIS.md # Master Requirements, Stakeholder & USP Analysis
 ├── ARCHITECTURE.md                          # High-level architecture proposal
 ├── README.md                                # Root README & quick start guide
 ├── docs/                                    # Exhaustive documentation directory
